@@ -1,0 +1,246 @@
+/* --- TOPBAR BASE --- */
+.topbar {
+  height: 64px;
+  background-color: var(--bg-topbar);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.05));
+}
+
+/* --- LOGO --- */
+.topbar-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: -0.5px;
+}
+
+.logo-accent {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.logo-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  border-radius: var(--radius-md, 10px);
+  color: white;
+  box-shadow: 0 2px 8px rgba(33, 93, 123, 0.3);
+}
+
+/* --- TOPBAR RIGHT SECTION --- */
+.topbar-timestamps {
+  display: flex;
+  align-items: center;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 4px 12px;
+  gap: 12px;
+  margin-right: 8px;
+}
+
+.timestamp-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.timestamp-icon.task {
+  color: var(--primary);
+}
+
+.timestamp-icon.qc {
+  color: #ef4444;
+}
+
+.timestamp-divider {
+  width: 1px;
+  height: 14px;
+  background-color: var(--border-color);
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.icon-btn:hover {
+  background: var(--bg-secondary);
+  color: var(--text-main);
+}
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* --- MODERN PILL SWITCH --- */
+.theme-pill {
+  position: relative;
+  width: 68px;
+  height: 34px;
+  border-radius: 34px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-page);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  transition: all 0.3s ease;
+}
+
+.theme-pill:hover {
+  border-color: var(--primary);
+}
+
+.theme-pill:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(33, 93, 123, 0.15);
+}
+
+.track-icon {
+  color: var(--text-muted);
+  z-index: 1;
+}
+
+.theme-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 26px;
+  height: 26px;
+  background-color: var(--primary);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  z-index: 2;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.4s ease;
+}
+
+.theme-pill.dark .theme-thumb {
+  transform: translateX(34px);
+  background-color: var(--secondary);
+}
+
+/* --- TOPBAR CENTER & GLOBAL SYNC BADGE --- */
+.topbar-center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.global-sync-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 16px;
+  border-radius: 30px;
+  font-size: 13px;
+  border: 1px solid transparent;
+  animation: slideDown 0.3s ease-out;
+  white-space: nowrap;
+}
+
+/* Slide animation when the badge appears */
+@keyframes slideDown {
+  from {
+    transform: translateY(-15px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.global-sync-badge.syncing {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: var(--primary);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.global-sync-badge.success {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.global-sync-badge.error {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.sync-badge-title {
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.sync-badge-progress {
+  font-size: 11px;
+  opacity: 0.8;
+  margin-top: 2px;
+  line-height: 1;
+}
+
+/* Universal spinning class */
+@keyframes spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.spinning {
+  animation: spin 1.2s linear infinite;
+}

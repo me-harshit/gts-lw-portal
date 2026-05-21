@@ -1,0 +1,153 @@
+/* --- frontend/src/components/SyncDataPage.css --- */
+
+.sync-page-container {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+  
+.sync-page-header {
+    margin-bottom: 36px;
+}
+  
+.sync-main-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.2));
+    color: var(--primary);
+    padding: 8px;
+    border-radius: 10px;
+}
+
+.sync-page-desc {
+    color: var(--text-muted);
+    margin-top: 10px;
+    font-size: 14.5px;
+    line-height: 1.6;
+}
+  
+.sync-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+}
+  
+/* --- CARD STYLES --- */
+.sync-card {
+    background: var(--bg-secondary);
+    padding: 24px;
+    border-radius: 14px;
+    border: 1px solid var(--border-color);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+    display: flex;
+    flex-direction: column;
+}
+  
+.sync-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    border-color: var(--primary);
+}
+
+.dark-mode .sync-card:hover {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+  
+.sync-card-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 16px;
+}
+  
+/* --- ICON WRAPPERS --- */
+.sync-icon-wrapper {
+    padding: 12px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+  
+.sync-icon-wrapper.task {
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--primary);
+}
+  
+.sync-icon-wrapper.qc {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
+.sync-icon-wrapper.translate {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+}
+  
+/* --- TEXT STYLES --- */
+.sync-card-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-main);
+}
+  
+.sync-last-updated {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 6px;
+}
+  
+.sync-card-body {
+    font-size: 13.5px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin-bottom: 24px;
+    flex-grow: 1; /* Pushes the button to the bottom evenly across all cards */
+}
+  
+/* --- BUTTONS --- */
+.sync-action-btn {
+    width: 100%;
+    padding: 12px;
+    background: var(--bg-main);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-main);
+    transition: all 0.2s ease;
+}
+  
+.sync-action-btn:hover:not(:disabled) {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+}
+  
+.sync-action-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+    background: var(--bg-main);
+    color: var(--text-muted);
+}
+
+/* Local spinning class just for the buttons */
+.spinning {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    100% {
+        transform: rotate(360deg);
+    }
+}

@@ -1,0 +1,292 @@
+/* --- DASHBOARD WRAPPER --- */
+.dashboard-card {
+  background-color: var(--bg-sidebar);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg, 16px);
+  padding: 24px;
+  box-shadow: var(--shadow-md, 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06));
+  transition: all 0.3s ease;
+}
+
+.dashboard-header {
+  margin-top: 0;
+  margin-bottom: 24px;
+  color: var(--primary);
+  font-size: 22px;
+  font-weight: 600;
+}
+
+/* --- SUMMARY CARDS (FILTERS) --- */
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.summary-card {
+  background-color: var(--bg-page);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md, 12px);
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.05));
+}
+
+.summary-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md, 0 4px 6px -1px rgba(0, 0, 0, 0.1));
+}
+
+.summary-card.active {
+  background-color: var(--primary);
+  border-color: var(--primary);
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md, 0 4px 6px -1px rgba(0, 0, 0, 0.1));
+}
+
+.card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.summary-card.active .card-title {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.card-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.summary-card.active .card-value {
+  color: #ffffff;
+}
+
+/* --- SEARCH & CONTROLS --- */
+.dashboard-controls {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+}
+
+.search-wrapper {
+  position: relative;
+  width: 300px;
+}
+
+.search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+}
+
+.search-input {
+  width: 100%;
+  padding: 12px 16px 12px 42px; /* Extra left padding for the icon */
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md, 12px);
+  background-color: var(--bg-page);
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.05));
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(33, 93, 123, 0.15); /* Soft primary color glow */
+}
+
+.search-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* --- MAIN TABLE --- */
+.task-table {
+  width: 100%;
+  text-align: left;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.task-table th {
+  padding: 16px;
+  border-bottom: 2px solid var(--border-color);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.task-table td {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-main);
+  vertical-align: top;
+  transition: background-color 0.3s ease;
+}
+
+.task-name {
+  font-weight: 600;
+  font-size: 15px;
+  display: block;
+}
+
+.task-desc {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-top: 6px;
+  display: block;
+  line-height: 1.4;
+}
+
+.status-badge {
+  padding: 6px 12px;
+  border-radius: 20px; /* Pill shape */
+  font-size: 12px;
+  font-weight: 600;
+  background-color: var(--bg-page);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  text-transform: capitalize;
+}
+
+/* --- PROGRESS BAR --- */
+.progress-track {
+  width: 100%;
+  background-color: var(--border-color);
+  border-radius: 10px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.progress-text {
+  color: var(--text-muted);
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* --- EXPANDABLE ROWS & ANIMATIONS --- */
+.expand-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 8px;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.expand-btn:hover {
+  background-color: var(--bg-page);
+  color: var(--primary);
+  transform: scale(1.1);
+}
+
+.expanded-content-row td {
+  padding: 0;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-page);
+}
+
+/* The CSS Grid Trick for smooth auto-height animation */
+.expand-wrapper {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.expand-wrapper.open {
+  grid-template-rows: 1fr;
+}
+
+.expand-inner {
+  min-height: 0;
+  overflow: hidden;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.4s ease;
+}
+
+/* Adds the border back only when the row is fully open */
+.expand-wrapper.open .expand-inner {
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* Layout for the inner cards */
+.expand-layout {
+  padding: 8px 24px 24px 70px; /* Aligns perfectly under the text columns */
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+/* The beautiful inner boxes */
+.meta-box {
+  background-color: var(--bg-page);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md, 12px);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+  transition: border-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.meta-box:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm, 0 4px 6px -1px rgba(0,0,0,0.05));
+}
+
+.meta-box-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.meta-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background-color: rgba(33, 93, 123, 0.1); /* Soft primary tint */
+  color: var(--primary);
+}
+
+.dark-mode .meta-icon-wrapper {
+  background-color: rgba(74, 158, 202, 0.15); /* Slightly brighter in dark mode */
+}
+
+.meta-box-text {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}

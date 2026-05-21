@@ -1,0 +1,130 @@
+/* --- QC Dashboard Tree Data Grid Styles --- */
+.qc-tree-container {
+    background: var(--bg-main);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* Master Table Header */
+.qc-tree-header {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: var(--bg-secondary);
+    border-bottom: 2px solid var(--border-color);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+}
+
+/* General Row Styles */
+.qc-tree-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.qc-tree-row:hover {
+    background: rgba(59, 130, 246, 0.04); /* Subtle primary tint on hover */
+}
+
+/* Level 1 (Top Level: Producer or Reason) */
+.qc-tree-row.level-1 {
+    background: var(--bg-main);
+}
+
+/* Level 2 (Middle Level: Task) */
+.qc-tree-row.level-2 {
+    background: var(--bg-secondary);
+    padding-left: 48px; /* Indent */
+    position: relative;
+}
+
+/* Level 3 (Deepest Level: Video Table Container) */
+.qc-tree-details {
+    background: var(--bg-main);
+    padding: 16px 24px 16px 72px; /* Deep Indent */
+    border-bottom: 1px solid var(--border-color);
+    position: relative;
+}
+
+/* --- THE MAGIC: Visual Tree Guidelines --- */
+/* Line connecting Level 1 to Level 2 */
+.qc-tree-row.level-2::before {
+    content: '';
+    position: absolute;
+    left: 28px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--border-color);
+}
+/* Line connecting Level 2 to Level 3 */
+.qc-tree-details::before {
+    content: '';
+    position: absolute;
+    left: 56px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--border-color);
+}
+
+/* Badges */
+.qc-badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.qc-badge.failed {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
+.qc-badge.neutral {
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+    border: 1px solid var(--border-color);
+}
+
+/* Inner Table Styles */
+.qc-inner-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--bg-main);
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.qc-inner-table th {
+    background: var(--bg-secondary);
+    padding: 10px 16px;
+    font-size: 12px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.qc-inner-table td {
+    padding: 12px 16px;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.qc-inner-table tr:last-child td {
+    border-bottom: none;
+}

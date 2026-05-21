@@ -1,0 +1,140 @@
+.team-board {
+    display: flex;
+    gap: 24px;
+    overflow-x: auto;
+    padding-bottom: 20px;
+    align-items: flex-start;
+}
+
+.team-column {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    min-width: 300px;
+    max-width: 300px;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 200px);
+}
+
+.team-column-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.team-badge {
+    background: var(--bg-main);
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.team-dropzone {
+    padding: 16px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 150px;
+    transition: background-color 0.2s ease;
+}
+
+/* Highlight the column when hovering over it with a dragged card */
+.team-dropzone.drag-over {
+    background-color: rgba(16, 185, 129, 0.05); /* Slight green tint */
+    border: 1px dashed #10b981;
+}
+
+.producer-card {
+    background: var(--bg-main);
+    border: 1px solid var(--border-color);
+    padding: 10px 14px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    cursor: grab;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.producer-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    border-color: var(--primary);
+}
+
+.producer-card:active {
+    cursor: grabbing;
+    transform: scale(0.98);
+}
+
+/* --- Top Controls Styling --- */
+
+.team-search-input {
+    width: 100%;
+    padding: 8px 16px 8px 36px; /* Space for icon */
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-main);
+    outline: none;
+    font-size: 13px;
+    height: 36px;
+    transition: border-color 0.2s;
+}
+
+.team-search-input:focus {
+    border-color: var(--primary);
+}
+
+.new-team-form {
+    display: flex;
+    gap: 8px;
+    margin: 0;
+}
+
+.new-team-input-field {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    padding: 8px 12px;
+    border-radius: 6px;
+    outline: none;
+    width: 220px;
+    font-size: 13px;
+    height: 36px;
+    transition: border-color 0.2s;
+}
+
+.new-team-input-field:focus {
+    border-color: var(--primary);
+}
+
+.add-team-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 16px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    height: 36px;
+    transition: background-color 0.2s, opacity 0.2s;
+}
+
+.add-team-btn:hover:not(:disabled) {
+    background-color: #2563eb;
+}
+
+.add-team-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

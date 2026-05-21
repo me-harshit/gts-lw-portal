@@ -1,0 +1,62 @@
+:root {
+  --primary: #215D7B;
+  --secondary: #A6477F;
+  --text-main: #000000;
+  --text-muted: #7A7A7A;
+  --bg-sidebar: #ffffff;
+  --bg-topbar: #ffffff;
+  --bg-page: #f4f7f9; /* Slightly darker to make white cards pop */
+  --border-color: #e2e8f0;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --radius-md: 12px;
+  --radius-lg: 16px;
+}
+
+.dark-mode {
+  --primary: #4A9ECA;
+  --secondary: #D46BAB;
+  --text-main: #f9fafb;
+  --text-muted: #9ca3af;
+  --bg-sidebar: #1f2937;
+  --bg-topbar: #1f2937;
+  --bg-page: #111827;
+  --border-color: #374151;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+}
+
+body {
+  margin: 0;
+  font-family: 'Poppins', sans-serif; /* Applied Poppins globally */
+  background-color: var(--bg-page);
+  color: var(--text-main);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+* { box-sizing: border-box; }
+
+.main-content {
+  margin-left: 260px; /* Accommodates the Sidebar */
+  margin-top: 64px;   /* Accommodates the Topbar */
+  padding: 32px;
+  min-height: calc(100vh - 64px);
+  transition: margin-left 0.3s ease; /* Prepares you for a collapsible sidebar later */
+}
+
+/* Spinning Refresh Icon  */
+
+@keyframes spin-animation {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin-animation {
+  animation: spin-animation 1.5s linear infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.5; }
+  50% { opacity: 1; }
+  100% { opacity: 0.5; }
+}
