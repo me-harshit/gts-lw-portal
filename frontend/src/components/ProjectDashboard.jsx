@@ -173,6 +173,19 @@ export default function ProjectDashboard() {
         return matchesTeam && matchesSearch;
     });
 
+    // --- PERCENTAGE CALCULATIONS ---
+    const totalCount = summary?.total?.count || 0;
+    const acceptedCount = summary?.accepted?.count || 0;
+    const rejectedCount = summary?.rejected?.count || 0;
+    const pendingCount = summary?.pending?.count || 0;
+
+    const inspectedCount = acceptedCount + rejectedCount;
+    
+    // Calculate percentages
+    const acceptanceRate = inspectedCount > 0 ? Math.round((acceptedCount / inspectedCount) * 100) : 0;
+    const rejectionRate = inspectedCount > 0 ? Math.round((rejectedCount / inspectedCount) * 100) : 0;
+    const pendingRate = totalCount > 0 ? Math.round((pendingCount / totalCount) * 100) : 0;
+
     return (
         <div className="dashboard-card">
 
@@ -227,28 +240,36 @@ export default function ProjectDashboard() {
                     <span className="card-title">Total Volume</span>
                     <div style={{ display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
                         <span className="card-value" style={{ color: 'var(--primary)', lineHeight: '1' }}>{formatDecimalHours(summary?.total?.hours)}</span>
-                        <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>{summary?.total?.count?.toLocaleString() ?? '--'} videos</span>
+                        <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>
+                            {totalCount.toLocaleString()} videos
+                        </span>
                     </div>
                 </div>
                 <div className="summary-card">
                     <span className="card-title">Total Accepted</span>
                     <div style={{ display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
                         <span className="card-value" style={{ color: '#10b981', lineHeight: '1' }}>{formatDecimalHours(summary?.accepted?.hours)}</span>
-                        <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>{summary?.accepted?.count?.toLocaleString() ?? '--'} videos</span>
+                        <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>
+                            {acceptedCount.toLocaleString()} videos {inspectedCount > 0 && `(${acceptanceRate}%)`}
+                        </span>
                     </div>
                 </div>
                 <div className="summary-card">
                     <span className="card-title">Total Rejected</span>
                     <div style={{ display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
                         <span className="card-value" style={{ color: '#ef4444', lineHeight: '1' }}>{formatDecimalHours(summary?.rejected?.hours)}</span>
-                        <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>{summary?.rejected?.count?.toLocaleString() ?? '--'} videos</span>
+                        <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>
+                            {rejectedCount.toLocaleString()} videos {inspectedCount > 0 && `(${rejectionRate}%)`}
+                        </span>
                     </div>
                 </div>
                 <div className="summary-card">
                     <span className="card-title">Pending QC</span>
                     <div style={{ display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
                         <span className="card-value" style={{ color: '#f59e0b', lineHeight: '1' }}>{formatDecimalHours(summary?.pending?.hours)}</span>
-                        <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>{summary?.pending?.count?.toLocaleString() ?? '--'} videos</span>
+                        <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>
+                            {pendingCount.toLocaleString()} videos {totalCount > 0 && `(${pendingRate}%)`}
+                        </span>
                     </div>
                 </div>
             </div>

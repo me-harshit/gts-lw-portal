@@ -89,7 +89,7 @@ export default function SyncDataPage() {
                             <ShieldAlert size={24} />
                         </div>
                         <div>
-                            <h3 className="sync-card-title">QC Records (Fast)</h3>
+                            <h3 className="sync-card-title">QC Records</h3>
                             <div className="sync-last-updated">
                                 <Clock size={12} />
                                 Last Synced: {formatTime(lastSyncTimes.qc)}
