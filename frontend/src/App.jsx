@@ -10,6 +10,7 @@ import TeamManagement from './components/TeamManagement';
 import AcceptanceLeaderboard from './components/AcceptanceLeaderboard';
 import PerformanceLeaderboard from './components/PerformanceLeaderboard';
 import QcDashboard from './components/QcDashboard';
+import QcLeaderboard from './components/QcLeaderboard';
 import AdminSettings from './components/AdminSettings';
 import SyncDataPage from './components/SyncDataPage';
 import Login from './components/Login'; 
@@ -52,6 +53,7 @@ export default function App() {
                       <Route path="/leaderboard" element={<AcceptanceLeaderboard />} />
                       <Route path="/performance" element={<PerformanceLeaderboard />} />
                       <Route path="/qc" element={<QcDashboard />} />
+                      <Route path="/qc-leaderboard" element={<QcLeaderboard />} />
 
                       {/* ADMIN ONLY ROUTES */}
                       <Route path="/teams" element={<ProtectedRoute adminOnly><TeamManagement /></ProtectedRoute>} />

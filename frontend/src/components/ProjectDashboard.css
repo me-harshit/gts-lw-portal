@@ -1,3 +1,58 @@
+/* --- PROJECT DASHBOARD CONTAINER --- */
+.dashboard-card {
+    background: var(--bg-main);
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--border-color);
+}
+
+.dashboard-header {
+    color: var(--text-main);
+    font-size: 20px;
+    font-weight: 600;
+}
+
+/* --- SUMMARY CARDS (Updated for 5 Cards) --- */
+.summary-cards {
+    display: flex;
+    flex-wrap: wrap; /* CRITICAL: Allows the 5th card to wrap on small screens */
+    gap: 16px;
+    margin-bottom: 40px;
+}
+
+.summary-card {
+    flex: 1;
+    min-width: 180px; /* Prevents cards from getting too squished */
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.summary-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.card-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.card-value {
+    font-size: 28px;
+    font-weight: 700;
+    margin-top: 4px;
+}
+
 /* --- GLOBAL FILTERS (Top Dropdowns) --- */
 .qc-filter-wrapper {
     display: flex;
@@ -162,8 +217,7 @@
     color: rgba(255, 255, 255, 0.8); 
 }
 
-
-/* Quick Date Filter Buttons */
+/* --- QUICK DATE FILTER BUTTONS --- */
 .quick-filters-container {
     display: flex;
     gap: 8px;

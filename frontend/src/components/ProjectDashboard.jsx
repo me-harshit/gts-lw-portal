@@ -2,12 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useQuery } from '@tanstack/react-query';
 import {
-    Filter, Calendar, User, ListChecks, Search, 
+    Filter, Calendar, User, ListChecks, Search,
     ChevronDown, Activity, Loader2
 } from 'lucide-react';
 import { formatDuration } from '../utils/timeFormat';
 import './TaskDashboard.css';
-import './ProjectDashboard.css'; 
+import './ProjectDashboard.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -38,8 +38,8 @@ const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder }) => 
                 <div className="searchable-dropdown-menu">
                     <ul className="searchable-dropdown-list">
                         {options.map(opt => (
-                            <li 
-                                key={opt.value} 
+                            <li
+                                key={opt.value}
                                 className={`searchable-dropdown-item ${value === opt.value ? 'active' : ''}`}
                                 onClick={() => { onChange(opt.value); setIsOpen(false); }}
                             >
@@ -90,7 +90,7 @@ export default function ProjectDashboard() {
     const applyQuickFilter = (type, setStart, setEnd, setActiveBtn) => {
         setActiveBtn(type);
         const today = new Date();
-        
+
         const formatDate = (date) => {
             const yyyy = date.getFullYear();
             const mm = String(date.getMonth() + 1).padStart(2, '0');
@@ -108,7 +108,7 @@ export default function ProjectDashboard() {
             setEnd(formatDate(yesterday));
         } else if (type === 'thisWeek') {
             const monday = new Date(today);
-            const day = monday.getDay() || 7; 
+            const day = monday.getDay() || 7;
             monday.setDate(monday.getDate() - (day - 1));
             setStart(formatDate(monday));
             setEnd(formatDate(today));
@@ -180,11 +180,16 @@ export default function ProjectDashboard() {
     const pendingCount = summary?.pending?.count || 0;
 
     const inspectedCount = acceptedCount + rejectedCount;
-    
-    // Calculate percentages
-    const acceptanceRate = inspectedCount > 0 ? Math.round((acceptedCount / inspectedCount) * 100) : 0;
-    const rejectionRate = inspectedCount > 0 ? Math.round((rejectedCount / inspectedCount) * 100) : 0;
-    const pendingRate = totalCount > 0 ? Math.round((pendingCount / totalCount) * 100) : 0;
+    // Calculate total hours for QC Done by adding accepted + rejected hours
+    const inspectedHours = (summary?.accepted?.hours || 0) + (summary?.rejected?.hours || 0);
+
+    // Calculate percentages (.toFixed(2) keeps exactly two decimal places)
+    const acceptanceRate = inspectedCount > 0 ? ((acceptedCount / inspectedCount) * 100).toFixed(2) : '0.00';
+    const rejectionRate = inspectedCount > 0 ? ((rejectedCount / inspectedCount) * 100).toFixed(2) : '0.00';
+
+    // Pending and QC Done rates are based on the Total Volume
+    const pendingRate = totalCount > 0 ? ((pendingCount / totalCount) * 100).toFixed(2) : '0.00';
+    const inspectedRate = totalCount > 0 ? ((inspectedCount / totalCount) * 100).toFixed(2) : '0.00';
 
     return (
         <div className="dashboard-card">
@@ -214,14 +219,14 @@ export default function ProjectDashboard() {
                         <input type="date" value={endDate} onChange={(e) => handleDateChange(setEndDate, e.target.value, setActiveGlobalFilter)} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none' }} />
                     </div>
 
-                    <CustomSelect 
+                    <CustomSelect
                         icon={User}
                         value={teamCategory}
                         onChange={setTeamCategory}
                         options={[{ value: 'ALL', label: 'All Teams' }, ...teams.map(t => ({ value: t, label: t }))]}
                     />
 
-                    <CustomSelect 
+                    <CustomSelect
                         icon={Filter}
                         value={viewCategory}
                         onChange={setViewCategory}
@@ -235,7 +240,7 @@ export default function ProjectDashboard() {
             </div>
 
             {/* GLOBAL SUMMARY CARDS */}
-            <div className="summary-cards" style={{ opacity: isFetchingSummary ? 0.5 : 1, transition: 'opacity 0.2s', marginBottom: '40px' }}>
+            <div className="summary-cards" style={{ opacity: isFetchingSummary ? 0.5 : 1, transition: 'opacity 0.2s', marginBottom: '40px', flexWrap: 'wrap' }}>
                 <div className="summary-card">
                     <span className="card-title">Total Volume</span>
                     <div style={{ display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
@@ -250,8 +255,13 @@ export default function ProjectDashboard() {
                     <div style={{ display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
                         <span className="card-value" style={{ color: '#10b981', lineHeight: '1' }}>{formatDecimalHours(summary?.accepted?.hours)}</span>
                         <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>
-                            {acceptedCount.toLocaleString()} videos {inspectedCount > 0 && `(${acceptanceRate}%)`}
+                            {acceptedCount.toLocaleString()} videos
                         </span>
+                        {inspectedCount > 0 && (
+                            <span style={{ fontSize: '13px', color: 'var(--text-main)', marginTop: '2px', fontWeight: '600' }}>
+                                Acceptance Rate - {acceptanceRate}%
+                            </span>
+                        )}
                     </div>
                 </div>
                 <div className="summary-card">
@@ -259,8 +269,28 @@ export default function ProjectDashboard() {
                     <div style={{ display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
                         <span className="card-value" style={{ color: '#ef4444', lineHeight: '1' }}>{formatDecimalHours(summary?.rejected?.hours)}</span>
                         <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>
-                            {rejectedCount.toLocaleString()} videos {inspectedCount > 0 && `(${rejectionRate}%)`}
+                            {rejectedCount.toLocaleString()} videos
                         </span>
+                        {inspectedCount > 0 && (
+                            <span style={{ fontSize: '13px', color: 'var(--text-main)', marginTop: '2px', fontWeight: '600' }}>
+                                Rejection Rate - {rejectionRate}%
+                            </span>
+                        )}
+                    </div>
+                </div>
+                {/* --- NEW QC DONE CARD --- */}
+                <div className="summary-card">
+                    <span className="card-title">QC Done</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
+                        <span className="card-value" style={{ color: '#3b82f6', lineHeight: '1' }}>{formatDecimalHours(inspectedHours)}</span>
+                        <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>
+                            {inspectedCount.toLocaleString()} videos
+                        </span>
+                        {totalCount > 0 && (
+                            <span style={{ fontSize: '13px', color: 'var(--text-main)', marginTop: '2px', fontWeight: '600' }}>
+                                QC Completed - {inspectedRate}%
+                            </span>
+                        )}
                     </div>
                 </div>
                 <div className="summary-card">
@@ -268,8 +298,13 @@ export default function ProjectDashboard() {
                     <div style={{ display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
                         <span className="card-value" style={{ color: '#f59e0b', lineHeight: '1' }}>{formatDecimalHours(summary?.pending?.hours)}</span>
                         <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>
-                            {pendingCount.toLocaleString()} videos {totalCount > 0 && `(${pendingRate}%)`}
+                            {pendingCount.toLocaleString()} videos
                         </span>
+                        {totalCount > 0 && (
+                            <span style={{ fontSize: '13px', color: 'var(--text-main)', marginTop: '2px', fontWeight: '600' }}>
+                                QC Pending - {pendingRate}%
+                            </span>
+                        )}
                     </div>
                 </div>
             </div>
