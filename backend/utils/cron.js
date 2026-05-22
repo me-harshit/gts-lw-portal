@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import { syncTasks } from '../controllers/taskRoutes.js'; // Adjust paths based on your actual exports
+import { syncTasks } from '../controllers/taskController.js';
 import { triggerDashboardSync, triggerTranslation } from '../controllers/dashboardController.js';
 import { globalSyncState } from './syncLock.js';
 
