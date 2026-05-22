@@ -5,7 +5,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser'; 
 import { connectDB } from './config/db.js'; 
-import { globalSyncState } from './utils/syncLock.js';
+import { globalSyncState, setIO } from './utils/syncLock.js';
 import { initCronJobs } from './utils/cron.js';
 import authRoutes from './routes/authRoutes.js'; 
 import taskRoutes from './routes/taskRoutes.js';
@@ -32,12 +32,14 @@ app.use(cors({
     credentials: true
 }));
 
-export const io = new Server(server, {
+const io = new Server(server, {
     cors: {
         origin: allowedOrigins,
         credentials: true
     }
 });
+
+setIO(io);
 
 io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);

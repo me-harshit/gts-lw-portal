@@ -2,8 +2,7 @@ import axios from 'axios';
 import https from 'https';
 import Task from '../models/Task.js';
 import AppConfig from '../models/AppConfig.js';
-import { io } from '../server.js'; // Import Socket.io
-import { globalSyncState } from '../utils/syncLock.js'; // Import the Lock
+import { globalSyncState, ioInstance as io } from '../utils/syncLock.js';
 
 const httpsAgent = new https.Agent({ 
     keepAlive: true,

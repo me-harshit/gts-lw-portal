@@ -2,9 +2,7 @@ import express from 'express';
 import { triggerDashboardSync, getPendingTranslationCount, triggerTranslation } from '../controllers/dashboardController.js'; 
 import { getDashboardSummary, getProducerHistory, getQcDetails } from '../controllers/dashboardStatsController.js';
 
-// ---> ADD THESE TWO IMPORTS <---
-import { globalSyncState } from '../utils/syncLock.js';
-import { io } from '../server.js';
+import { globalSyncState, ioInstance as io } from '../utils/syncLock.js';
 
 const router = express.Router();
 

@@ -5,8 +5,7 @@ import AllRecord from '../models/AllRecords.js';
 import AppConfig from '../models/AppConfig.js';
 import https from 'https';
 import translate from 'google-translate-api-x';
-import { io } from '../server.js';
-import { globalSyncState } from '../utils/syncLock.js'; // Import Lock
+import { globalSyncState, ioInstance as io } from '../utils/syncLock.js';
 
 const httpsAgent = new https.Agent({
     keepAlive: true,
