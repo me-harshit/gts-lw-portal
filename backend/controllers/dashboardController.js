@@ -5,7 +5,7 @@ import AllRecord from '../models/AllRecords.js';
 import AppConfig from '../models/AppConfig.js';
 import https from 'https';
 import translate from 'google-translate-api-x';
-import { globalSyncState, ioInstance as io } from '../utils/syncLock.js';
+import { globalSyncState, updateSyncState, finishSync, errorSync } from '../utils/syncLock.js';
 
 const httpsAgent = new https.Agent({
     keepAlive: true,
@@ -32,11 +32,12 @@ export const triggerDashboardSync = async (req, res) => {
 
     const { projects } = req.body;
     
-    globalSyncState.isSyncing = true;
-    globalSyncState.type = 'QC';
-    globalSyncState.message = 'Initializing QC Sync...';
-    globalSyncState.progress = 0;
-    io.emit('sync_update', globalSyncState);
+    updateSyncState({
+        isSyncing: true,
+        type: 'QC',
+        message: 'Initializing QC Sync...',
+        progress: 0
+    });
 
     res.status(202).json({ message: "QC Sync Queue Started" });
 
@@ -53,8 +54,7 @@ export const triggerDashboardSync = async (req, res) => {
                 const proj = projects[pIndex];
                 const prefix = projects.length > 1 ? `[${proj.name}] ` : '';
 
-                globalSyncState.message = `${prefix}Creating Export on Lightwheel...`;
-                io.emit('sync_update', globalSyncState);
+                updateSyncState({ message: `${prefix}Creating Export on Lightwheel...` });
                 let exportId = null;
                 let createAttempts = 0;
 
@@ -76,8 +76,7 @@ export const triggerDashboardSync = async (req, res) => {
                     }
                 }
 
-                globalSyncState.message = `${prefix}Waiting for ZIP compilation...`;
-                io.emit('sync_update', globalSyncState);
+                updateSyncState({ message: `${prefix}Waiting for ZIP compilation...` });
                 let downloadUrl = null;
 
                 for (let i = 0; i < 40; i++) {
@@ -93,8 +92,7 @@ export const triggerDashboardSync = async (req, res) => {
                             downloadUrl = match.downloadUrl;
                             break;
                         }
-                        globalSyncState.message = `${prefix}Compiling ZIP... (Attempt ${i + 1})`;
-                        io.emit('sync_update', globalSyncState);
+                        updateSyncState({ message: `${prefix}Compiling ZIP... (Attempt ${i + 1})` });
                     } catch (pollError) {
                         if (pollError.response && pollError.response.status === 401) {
                             throw new Error('Lightwheel Token Expired! Please refresh in Admin Settings.');
@@ -104,8 +102,7 @@ export const triggerDashboardSync = async (req, res) => {
 
                 if (!downloadUrl) throw new Error(`${proj.name} Export Timeout: ZIP never finished.`);
 
-                globalSyncState.message = `${prefix}Downloading ZIP...`;
-                io.emit('sync_update', globalSyncState);
+                updateSyncState({ message: `${prefix}Downloading ZIP...` });
                 const downloadHeaders = {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                     'Accept': '*/*',
@@ -129,8 +126,7 @@ export const triggerDashboardSync = async (req, res) => {
                     }
                 }
 
-                globalSyncState.message = `${prefix}Processing Data...`;
-                io.emit('sync_update', globalSyncState);
+                updateSyncState({ message: `${prefix}Processing Data...` });
 
                 let batch = [];
                 const parserStream = zipRes.data
@@ -158,10 +154,7 @@ export const triggerDashboardSync = async (req, res) => {
                     if (batch.length >= 3000) {
                         await AllRecord.bulkWrite(batch, { ordered: false });
                         totalProcessed += batch.length;
-                        
-                        // Emit live progress updates!
-                        globalSyncState.progress = totalProcessed;
-                        io.emit('sync_update', globalSyncState);
+                        updateSyncState({ progress: totalProcessed });
                         batch = [];
                     }
                 }
@@ -169,8 +162,7 @@ export const triggerDashboardSync = async (req, res) => {
                 if (batch.length > 0) {
                     await AllRecord.bulkWrite(batch, { ordered: false });
                     totalProcessed += batch.length;
-                    globalSyncState.progress = totalProcessed;
-                    io.emit('sync_update', globalSyncState);
+                    updateSyncState({ progress: totalProcessed });
                 }
             }
 
@@ -179,13 +171,10 @@ export const triggerDashboardSync = async (req, res) => {
                 { lastQcSync: new Date() }
             );
 
-            globalSyncState.isSyncing = false;
-            globalSyncState.message = 'QC Database Synced Successfully!';
-            io.emit('sync_finished', globalSyncState);
+            finishSync('QC Database Synced Successfully!');
 
         } catch (error) {
-            globalSyncState.isSyncing = false;
-            io.emit('sync_error', { message: error.message });
+            errorSync(error.message);
         }
     })();
 };
@@ -210,11 +199,12 @@ export const triggerTranslation = async (req, res) => {
         return res.status(409).json({ error: 'A sync operation is already in progress globally.' });
     }
 
-    globalSyncState.isSyncing = true;
-    globalSyncState.type = 'TRANSLATE';
-    globalSyncState.message = 'Initializing Translation Engine...';
-    globalSyncState.progress = 0;
-    io.emit('sync_update', globalSyncState);
+    updateSyncState({
+        isSyncing: true,
+        type: 'TRANSLATE',
+        message: 'Initializing Translation Engine...',
+        progress: 0
+    });
 
     res.status(202).json({ message: "Translation Queue Started" });
 
@@ -229,14 +219,11 @@ export const triggerTranslation = async (req, res) => {
             }).select('_id data_name inspect_issue_description');
 
             if (recordsToTranslate.length === 0) {
-                globalSyncState.isSyncing = false;
-                globalSyncState.message = 'No records require translation.';
-                io.emit('sync_finished', globalSyncState);
+                finishSync('No records require translation.');
                 return;
             }
 
-            globalSyncState.message = `Translating ${recordsToTranslate.length} records...`;
-            io.emit('sync_update', globalSyncState);
+            updateSyncState({ message: `Translating ${recordsToTranslate.length} records...` });
 
             let processed = 0;
             let consecutiveFailures = 0;
@@ -277,10 +264,8 @@ export const triggerTranslation = async (req, res) => {
                 }
 
                 processed++;
-                globalSyncState.progress = processed;
-                // Emit progress every 5 records to avoid flooding the socket
                 if (processed % 5 === 0) {
-                    io.emit('sync_update', globalSyncState);
+                    updateSyncState({ progress: processed });
                 }
 
                 if (consecutiveFailures >= 5) {
@@ -288,14 +273,10 @@ export const triggerTranslation = async (req, res) => {
                 }
             }
 
-            globalSyncState.isSyncing = false;
-            globalSyncState.message = 'Translation Complete!';
-            globalSyncState.progress = processed;
-            io.emit('sync_finished', globalSyncState);
+            finishSync('Translation Complete!');
 
         } catch (error) {
-            globalSyncState.isSyncing = false;
-            io.emit('sync_error', { message: error.message });
+            errorSync(error.message);
         }
     })();
 };

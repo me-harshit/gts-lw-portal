@@ -1,19 +1,13 @@
 import express from 'express';
 import { triggerDashboardSync, getPendingTranslationCount, triggerTranslation } from '../controllers/dashboardController.js'; 
 import { getDashboardSummary, getProducerHistory, getQcDetails } from '../controllers/dashboardStatsController.js';
-
-import { globalSyncState, ioInstance as io } from '../utils/syncLock.js';
+import { finishSync } from '../utils/syncLock.js';
 
 const router = express.Router();
 
+// --- THE MASTER KEY: HIDDEN UNLOCK ROUTE ---
 router.get('/unlock', (req, res) => {
-    globalSyncState.isSyncing = false;
-    globalSyncState.type = null;
-    globalSyncState.message = '';
-    globalSyncState.progress = 0;
-    
-    io.emit('sync_finished', { message: 'Lock forcefully cleared by Admin.' });
-    
+    finishSync('Lock forcefully cleared by Admin.');
     res.send('<h1>✅ System Unlocked!</h1><p>The memory lock has been wiped. You can now trigger a manual sync.</p>');
 });
 

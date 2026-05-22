@@ -2,7 +2,7 @@ import axios from 'axios';
 import https from 'https';
 import Task from '../models/Task.js';
 import AppConfig from '../models/AppConfig.js';
-import { globalSyncState, ioInstance as io } from '../utils/syncLock.js';
+import { globalSyncState, updateSyncState, finishSync, errorSync } from '../utils/syncLock.js'; 
 
 const httpsAgent = new https.Agent({ 
     keepAlive: true,
@@ -31,24 +31,21 @@ export const getTasks = async (req, res) => {
 };
 
 export const syncTasks = async (req, res) => {
-    // 1. Check the Global Lock
     if (globalSyncState.isSyncing) {
         return res.status(409).json({ error: 'A sync operation is already in progress globally.' });
     }
 
     const { projects } = req.body; 
 
-    // 2. Engage the Lock
-    globalSyncState.isSyncing = true;
-    globalSyncState.type = 'TASK';
-    globalSyncState.message = 'Initializing Task Sync...';
-    globalSyncState.progress = 0;
-    io.emit('sync_update', globalSyncState);
+    updateSyncState({
+        isSyncing: true,
+        type: 'TASK',
+        message: 'Initializing Task Sync...',
+        progress: 0
+    });
 
-    // 3. Respond instantly so the browser doesn't hang
     res.status(202).json({ message: 'Task Sync Queued' });
 
-    // 4. Run the heavy logic in the background
     (async () => {
         try {
             const config = await AppConfig.findOne({ configId: 'global_settings' });
@@ -61,8 +58,7 @@ export const syncTasks = async (req, res) => {
 
             for (let i = 0; i < projects.length; i++) {
                 const proj = projects[i];
-                globalSyncState.message = `Fetching project: ${proj.category}...`;
-                io.emit('sync_update', globalSyncState);
+                updateSyncState({ message: `Fetching project: ${proj.category}...` });
                 
                 let response = null;
                 let attempts = 0;
@@ -117,8 +113,7 @@ export const syncTasks = async (req, res) => {
             }
 
             if (batch.length > 0) {
-                globalSyncState.message = `Saving ${batch.length} tasks to database...`;
-                io.emit('sync_update', globalSyncState);
+                updateSyncState({ message: `Saving ${batch.length} tasks to database...` });
 
                 let dbAttempts = 0;
                 let dbSuccess = false;
@@ -139,16 +134,10 @@ export const syncTasks = async (req, res) => {
                 { lastTaskSync: new Date() }
             );
 
-            // 5. Release Lock and Broadcast Success
-            globalSyncState.isSyncing = false;
-            globalSyncState.message = 'Tasks successfully synchronized!';
-            io.emit('sync_finished', globalSyncState);
+            finishSync('Tasks successfully synchronized!');
 
         } catch (error) {
-            // 6. Release Lock and Broadcast Error
-            globalSyncState.isSyncing = false;
-            io.emit('sync_error', { message: error.message });
-            console.error('🚨 Sync Error:', error.message);
+            errorSync(error.message);
         }
     })();
 };
