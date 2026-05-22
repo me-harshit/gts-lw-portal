@@ -5,6 +5,8 @@ import AllRecord from '../models/AllRecords.js';
 import AppConfig from '../models/AppConfig.js';
 import https from 'https';
 import translate from 'google-translate-api-x';
+import { io } from '../server.js';
+import { globalSyncState } from '../utils/syncLock.js'; // Import Lock
 
 const httpsAgent = new https.Agent({
     keepAlive: true,
@@ -13,10 +15,6 @@ const httpsAgent = new https.Agent({
     timeout: 60000
 });
 
-export const activeJobs = {};
-
-// --- DYNAMIC HEADERS HELPER ---
-// We pass the config object in here so it ALWAYS uses the fresh database token
 const getHeaders = (config) => ({
     'Authorization': `Bearer ${config.lightwheelToken}`,
     'username': config.lightwheelUsername,
@@ -29,198 +27,170 @@ const getHeaders = (config) => ({
 });
 
 export const triggerDashboardSync = async (req, res) => {
-    const { projects } = req.body;
-    const jobId = `job_${Date.now()}`;
-
-    // 1. Fetch config from DB
-    const config = await AppConfig.findOne({ configId: 'global_settings' });
-    if (!config || !config.lightwheelToken) {
-        return res.status(400).json({ error: 'Missing Lightwheel API Token. Please update Admin Settings.' });
+    if (globalSyncState.isSyncing) {
+        return res.status(409).json({ error: 'A sync operation is already in progress globally.' });
     }
 
-    activeJobs[jobId] = { status: 'Initializing...', progress: 0 };
-    res.status(202).json({ message: "QC Sync Queue Started", jobId });
+    const { projects } = req.body;
+    
+    globalSyncState.isSyncing = true;
+    globalSyncState.type = 'QC';
+    globalSyncState.message = 'Initializing QC Sync...';
+    globalSyncState.progress = 0;
+    io.emit('sync_update', globalSyncState);
 
-    try {
-        let totalProcessed = 0;
+    res.status(202).json({ message: "QC Sync Queue Started" });
 
-        for (let pIndex = 0; pIndex < projects.length; pIndex++) {
-            const proj = projects[pIndex];
-            const prefix = projects.length > 1 ? `[${proj.name}] ` : '';
-
-            // --- A. Create Export ---
-            activeJobs[jobId].status = `${prefix}Creating Export on Lightwheel...`;
-            let exportId = null;
-            let createAttempts = 0;
-
-            while (createAttempts < 3 && !exportId) {
-                try {
-                    createAttempts++;
-                    const createRes = await axios.post(
-                        `${config.lightwheelQcApi}/create`,
-                        { collectFilter: { projectUuids: [proj.id] } },
-                        { headers: getHeaders(config), httpsAgent, timeout: 90000 } // Pass config here
-                    );
-                    exportId = createRes.data.data.id;
-                } catch (err) {
-                    if (err.response && err.response.status === 401) {
-                        activeJobs[jobId].status = 'Failed';
-                        activeJobs[jobId].error = 'Lightwheel Token Expired! Please refresh in Admin Settings.';
-                        console.error("🚨 Lightwheel 401 Unauthorized - Token Expired");
-                        return;
-                    }
-
-                    console.warn(`[QC Sync] ${proj.name} Create attempt ${createAttempts} failed: ${err.message}`);
-                    if (createAttempts >= 3) {
-                        throw new Error(`Failed to create export for ${proj.name}. (${err.message})`);
-                    }
-                    await new Promise(resolve => setTimeout(resolve, 3000));
-                }
+    (async () => {
+        try {
+            const config = await AppConfig.findOne({ configId: 'global_settings' });
+            if (!config || !config.lightwheelToken) {
+                throw new Error('Missing Lightwheel API Token. Please update Admin Settings.');
             }
 
-            // --- B. Poll for Download URL ---
-            activeJobs[jobId].status = `${prefix}Waiting for ZIP compilation...`;
-            let downloadUrl = null;
+            let totalProcessed = 0;
 
-            for (let i = 0; i < 40; i++) {
-                await new Promise(resolve => setTimeout(resolve, 5000));
+            for (let pIndex = 0; pIndex < projects.length; pIndex++) {
+                const proj = projects[pIndex];
+                const prefix = projects.length > 1 ? `[${proj.name}] ` : '';
 
-                try {
-                    const listRes = await axios.post(
-                        `${config.lightwheelQcApi}/list`,
-                        { page: 1, pageSize: 20 },
-                        { headers: getHeaders(config), httpsAgent, timeout: 60000 } // Pass config here
-                    );
+                globalSyncState.message = `${prefix}Creating Export on Lightwheel...`;
+                io.emit('sync_update', globalSyncState);
+                let exportId = null;
+                let createAttempts = 0;
 
-                    const match = listRes.data.data.find(item => item.id === exportId);
-
-                    if (match && match.downloadUrl) {
-                        downloadUrl = match.downloadUrl;
-                        break;
+                while (createAttempts < 3 && !exportId) {
+                    try {
+                        createAttempts++;
+                        const createRes = await axios.post(
+                            `${config.lightwheelQcApi}/create`,
+                            { collectFilter: { projectUuids: [proj.id] } },
+                            { headers: getHeaders(config), httpsAgent, timeout: 90000 }
+                        );
+                        exportId = createRes.data.data.id;
+                    } catch (err) {
+                        if (err.response && err.response.status === 401) {
+                            throw new Error('Lightwheel Token Expired! Please refresh in Admin Settings.');
+                        }
+                        if (createAttempts >= 3) throw new Error(`Failed to create export for ${proj.name}.`);
+                        await new Promise(resolve => setTimeout(resolve, 3000));
                     }
-
-                    activeJobs[jobId].status = `${prefix}Compiling ZIP... (Attempt ${i + 1})`;
-                } catch (pollError) {
-                    if (pollError.response && pollError.response.status === 401) {
-                        activeJobs[jobId].status = 'Failed';
-                        activeJobs[jobId].error = 'Lightwheel Token Expired! Please refresh in Admin Settings.';
-                        return;
-                    }
-                    console.warn(`[QC Sync] Polling attempt ${i + 1} timed out. Retrying...`);
                 }
-            }
 
-            if (!downloadUrl) throw new Error(`${proj.name} Export Timeout: ZIP never finished.`);
+                globalSyncState.message = `${prefix}Waiting for ZIP compilation...`;
+                io.emit('sync_update', globalSyncState);
+                let downloadUrl = null;
 
-            // --- C. Download ZIP ---
-            activeJobs[jobId].status = `${prefix}Downloading ZIP...`;
-            const downloadHeaders = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept': '*/*',
-                'Accept-Encoding': 'identity'
-            };
-
-            let zipRes = null;
-            let downloadAttempts = 0;
-
-            while (downloadAttempts < 3 && !zipRes) {
-                try {
-                    downloadAttempts++;
-                    if (downloadAttempts > 1) {
-                        activeJobs[jobId].status = `${prefix}Downloading ZIP... (Attempt ${downloadAttempts})`;
-                    }
-                    zipRes = await axios.get(downloadUrl, {
-                        responseType: 'stream',
-                        headers: downloadHeaders,
-                        timeout: 300000
-                    });
-                } catch (err) {
-                    if (downloadAttempts >= 3) throw new Error(`Failed to download ${proj.name}. (${err.message})`);
+                for (let i = 0; i < 40; i++) {
                     await new Promise(resolve => setTimeout(resolve, 5000));
-                }
-            }
-
-            // --- D. Stream Data into MongoDB ---
-            activeJobs[jobId].status = `${prefix}Processing Data...`;
-
-            let batch = [];
-            const parserStream = zipRes.data
-                .pipe(unzipper.ParseOne(/\.csv$/i))
-                .pipe(csv());
-
-            const formatLightwheelDate = (dateStr) => {
-                if (!dateStr) return null;
-                return new Date(dateStr.trim().replace(' ', 'T') + 'Z');
-            };
-
-            for await (const row of parserStream) {
-                const formattedRow = { ...row };
-
-                if (formattedRow.start_produce_time) formattedRow.start_produce_time = formatLightwheelDate(formattedRow.start_produce_time);
-                if (formattedRow.inspect_time) formattedRow.inspect_time = formatLightwheelDate(formattedRow.inspect_time);
-
-                batch.push({
-                    updateOne: {
-                        filter: { data_name: row.data_name },
-                        update: { $set: { ...formattedRow, project_category: proj.category } },
-                        upsert: true
+                    try {
+                        const listRes = await axios.post(
+                            `${config.lightwheelQcApi}/list`,
+                            { page: 1, pageSize: 20 },
+                            { headers: getHeaders(config), httpsAgent, timeout: 60000 }
+                        );
+                        const match = listRes.data.data.find(item => item.id === exportId);
+                        if (match && match.downloadUrl) {
+                            downloadUrl = match.downloadUrl;
+                            break;
+                        }
+                        globalSyncState.message = `${prefix}Compiling ZIP... (Attempt ${i + 1})`;
+                        io.emit('sync_update', globalSyncState);
+                    } catch (pollError) {
+                        if (pollError.response && pollError.response.status === 401) {
+                            throw new Error('Lightwheel Token Expired! Please refresh in Admin Settings.');
+                        }
                     }
-                });
+                }
 
-                if (batch.length >= 3000) {
+                if (!downloadUrl) throw new Error(`${proj.name} Export Timeout: ZIP never finished.`);
+
+                globalSyncState.message = `${prefix}Downloading ZIP...`;
+                io.emit('sync_update', globalSyncState);
+                const downloadHeaders = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Accept': '*/*',
+                    'Accept-Encoding': 'identity'
+                };
+
+                let zipRes = null;
+                let downloadAttempts = 0;
+
+                while (downloadAttempts < 3 && !zipRes) {
+                    try {
+                        downloadAttempts++;
+                        zipRes = await axios.get(downloadUrl, {
+                            responseType: 'stream',
+                            headers: downloadHeaders,
+                            timeout: 300000
+                        });
+                    } catch (err) {
+                        if (downloadAttempts >= 3) throw new Error(`Failed to download ${proj.name}.`);
+                        await new Promise(resolve => setTimeout(resolve, 5000));
+                    }
+                }
+
+                globalSyncState.message = `${prefix}Processing Data...`;
+                io.emit('sync_update', globalSyncState);
+
+                let batch = [];
+                const parserStream = zipRes.data
+                    .pipe(unzipper.ParseOne(/\.csv$/i))
+                    .pipe(csv());
+
+                const formatLightwheelDate = (dateStr) => {
+                    if (!dateStr) return null;
+                    return new Date(dateStr.trim().replace(' ', 'T') + 'Z');
+                };
+
+                for await (const row of parserStream) {
+                    const formattedRow = { ...row };
+                    if (formattedRow.start_produce_time) formattedRow.start_produce_time = formatLightwheelDate(formattedRow.start_produce_time);
+                    if (formattedRow.inspect_time) formattedRow.inspect_time = formatLightwheelDate(formattedRow.inspect_time);
+
+                    batch.push({
+                        updateOne: {
+                            filter: { data_name: row.data_name },
+                            update: { $set: { ...formattedRow, project_category: proj.category } },
+                            upsert: true
+                        }
+                    });
+
+                    if (batch.length >= 3000) {
+                        await AllRecord.bulkWrite(batch, { ordered: false });
+                        totalProcessed += batch.length;
+                        
+                        // Emit live progress updates!
+                        globalSyncState.progress = totalProcessed;
+                        io.emit('sync_update', globalSyncState);
+                        batch = [];
+                    }
+                }
+
+                if (batch.length > 0) {
                     await AllRecord.bulkWrite(batch, { ordered: false });
                     totalProcessed += batch.length;
-                    activeJobs[jobId].progress = totalProcessed;
-                    batch = [];
+                    globalSyncState.progress = totalProcessed;
+                    io.emit('sync_update', globalSyncState);
                 }
             }
 
-            if (batch.length > 0) {
-                await AllRecord.bulkWrite(batch, { ordered: false });
-                totalProcessed += batch.length;
-                activeJobs[jobId].progress = totalProcessed;
-            }
+            await AppConfig.findOneAndUpdate(
+                { configId: 'global_settings' },
+                { lastQcSync: new Date() }
+            );
 
-            if (pIndex < projects.length - 1) {
-                activeJobs[jobId].status = `${proj.name} done. Preparing next project...`;
-                await new Promise(resolve => setTimeout(resolve, 3000));
-            }
+            globalSyncState.isSyncing = false;
+            globalSyncState.message = 'QC Database Synced Successfully!';
+            io.emit('sync_finished', globalSyncState);
+
+        } catch (error) {
+            globalSyncState.isSyncing = false;
+            io.emit('sync_error', { message: error.message });
         }
-
-        // 5. UPDATE LAST SYNCED TIMESTAMP
-        await AppConfig.findOneAndUpdate(
-            { configId: 'global_settings' },
-            { lastQcSync: new Date() }
-        );
-
-        activeJobs[jobId].status = 'Completed';
-
-    } catch (error) {
-        let errorMessage = "An unknown error occurred.";
-        if (error.response && error.response.data) {
-            errorMessage = `Lightwheel API Error: ${JSON.stringify(error.response.data)}`;
-        } else if (error.message) {
-            errorMessage = error.message;
-        }
-
-        console.error("\n🚨 --- QC SYNC CRASH REPORT --- 🚨\n", errorMessage, "\n----------------------------------");
-        activeJobs[jobId].status = 'Failed';
-        activeJobs[jobId].error = errorMessage;
-    }
+    })();
 };
 
-export const getJobStatus = (req, res) => {
-    const { jobId } = req.params;
-    const job = activeJobs[jobId];
-
-    if (!job) {
-        return res.status(404).json({ error: "Job not found" });
-    }
-
-    res.json(job);
-};
-
-// --- NEW: Check Pending Translations ---
 export const getPendingTranslationCount = async (req, res) => {
     try {
         const count = await AllRecord.countDocuments({
@@ -236,87 +206,97 @@ export const getPendingTranslationCount = async (req, res) => {
     }
 };
 
-// --- NEW: Trigger Background Translation (Armored Version) ---
 export const triggerTranslation = async (req, res) => {
-    const jobId = `trans_${Date.now()}`;
-    activeJobs[jobId] = { status: 'Initializing Translation Engine...', progress: 0, total: 0 };
-    res.status(202).json({ message: "Translation Queue Started", jobId });
+    if (globalSyncState.isSyncing) {
+        return res.status(409).json({ error: 'A sync operation is already in progress globally.' });
+    }
 
-    try {
-        const recordsToTranslate = await AllRecord.find({
-            inspect_result: 'INSPECT_FAILED',
-            $or: [
-                { inspect_issue_description_en: { $exists: false } },
-                { inspect_issue_description_en: null }
-            ]
-        }).select('_id data_name inspect_issue_description');
+    globalSyncState.isSyncing = true;
+    globalSyncState.type = 'TRANSLATE';
+    globalSyncState.message = 'Initializing Translation Engine...';
+    globalSyncState.progress = 0;
+    io.emit('sync_update', globalSyncState);
 
-        activeJobs[jobId].total = recordsToTranslate.length;
+    res.status(202).json({ message: "Translation Queue Started" });
 
-        if (recordsToTranslate.length === 0) {
-            activeJobs[jobId].status = 'Completed';
-            return;
-        }
+    (async () => {
+        try {
+            const recordsToTranslate = await AllRecord.find({
+                inspect_result: 'INSPECT_FAILED',
+                $or: [
+                    { inspect_issue_description_en: { $exists: false } },
+                    { inspect_issue_description_en: null }
+                ]
+            }).select('_id data_name inspect_issue_description');
 
-        activeJobs[jobId].status = `Translating ${recordsToTranslate.length} records...`;
+            if (recordsToTranslate.length === 0) {
+                globalSyncState.isSyncing = false;
+                globalSyncState.message = 'No records require translation.';
+                io.emit('sync_finished', globalSyncState);
+                return;
+            }
 
-        let processed = 0;
-        let consecutiveFailures = 0; // The Circuit Breaker counter
+            globalSyncState.message = `Translating ${recordsToTranslate.length} records...`;
+            io.emit('sync_update', globalSyncState);
 
-        for (const record of recordsToTranslate) {
-            let updateData = {};
-            let success = false;
-            let attempts = 0;
+            let processed = 0;
+            let consecutiveFailures = 0;
 
-            // RETRY LOOP: Try up to 3 times per record
-            while (attempts < 3 && !success) {
-                try {
-                    attempts++;
-                    
-                    // EXPONENTIAL BACKOFF: Wait 500ms on attempt 1, 1500ms on attempt 2, etc.
-                    const waitTime = 500 + (attempts * 1000);
-                    await new Promise(resolve => setTimeout(resolve, waitTime)); 
+            for (const record of recordsToTranslate) {
+                let updateData = {};
+                let success = false;
+                let attempts = 0;
 
-                    if (record.data_name) {
-                        const nameRes = await translate(record.data_name, { to: 'en' });
-                        updateData.data_name_en = nameRes.text;
+                while (attempts < 3 && !success) {
+                    try {
+                        attempts++;
+                        const waitTime = 500 + (attempts * 1000);
+                        await new Promise(resolve => setTimeout(resolve, waitTime)); 
+
+                        if (record.data_name) {
+                            const nameRes = await translate(record.data_name, { to: 'en' });
+                            updateData.data_name_en = nameRes.text;
+                        }
+
+                        if (record.inspect_issue_description) {
+                            const descRes = await translate(record.inspect_issue_description, { to: 'en' });
+                            updateData.inspect_issue_description_en = descRes.text;
+                        }
+
+                        if (Object.keys(updateData).length > 0) {
+                            await AllRecord.updateOne({ _id: record._id }, { $set: updateData });
+                        }
+
+                        success = true;
+                        consecutiveFailures = 0; 
+
+                    } catch (err) {
+                        if (attempts >= 3) {
+                            consecutiveFailures++;
+                        }
                     }
+                }
 
-                    if (record.inspect_issue_description) {
-                        const descRes = await translate(record.inspect_issue_description, { to: 'en' });
-                        updateData.inspect_issue_description_en = descRes.text;
-                    }
+                processed++;
+                globalSyncState.progress = processed;
+                // Emit progress every 5 records to avoid flooding the socket
+                if (processed % 5 === 0) {
+                    io.emit('sync_update', globalSyncState);
+                }
 
-                    if (Object.keys(updateData).length > 0) {
-                        await AllRecord.updateOne({ _id: record._id }, { $set: updateData });
-                    }
-
-                    success = true;
-                    consecutiveFailures = 0; // Reset the breaker on a successful translation
-
-                } catch (err) {
-                    if (attempts >= 3) {
-                        console.warn(`[Translate] Failed on row ID: ${record._id}. Giving up on this row.`);
-                        consecutiveFailures++;
-                    }
+                if (consecutiveFailures >= 5) {
+                    throw new Error("Google API Rate Limited. Try again in 30 minutes.");
                 }
             }
 
-            processed++;
-            activeJobs[jobId].progress = processed;
+            globalSyncState.isSyncing = false;
+            globalSyncState.message = 'Translation Complete!';
+            globalSyncState.progress = processed;
+            io.emit('sync_finished', globalSyncState);
 
-            // CIRCUIT BREAKER: If 5 rows fail completely in a row, Google has rate-limited us.
-            // Halt the entire job to protect the server's IP address.
-            if (consecutiveFailures >= 5) {
-                throw new Error("Google API Rate Limited. Engine paused to protect IP address. Try again in 30 minutes.");
-            }
+        } catch (error) {
+            globalSyncState.isSyncing = false;
+            io.emit('sync_error', { message: error.message });
         }
-
-        activeJobs[jobId].status = 'Completed';
-
-    } catch (error) {
-        console.error("Translation Engine Halted:", error.message);
-        activeJobs[jobId].status = 'Failed';
-        activeJobs[jobId].error = error.message;
-    }
+    })();
 };

@@ -1,12 +1,11 @@
 import express from 'express';
-import { triggerDashboardSync, getJobStatus, getPendingTranslationCount, triggerTranslation } from '../controllers/dashboardController.js'; 
+import { triggerDashboardSync, getPendingTranslationCount, triggerTranslation } from '../controllers/dashboardController.js'; 
 import { getDashboardSummary, getProducerHistory, getQcDetails } from '../controllers/dashboardStatsController.js';
 
 const router = express.Router();
 
 // --- SYNC ROUTES ---
 router.post('/sync', triggerDashboardSync);
-router.get('/status/:jobId', getJobStatus);
 router.get('/translate/pending', getPendingTranslationCount);
 router.post('/translate/start', triggerTranslation);
 
