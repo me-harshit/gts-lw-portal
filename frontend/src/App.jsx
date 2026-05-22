@@ -11,25 +11,19 @@ import AcceptanceLeaderboard from './components/AcceptanceLeaderboard';
 import PerformanceLeaderboard from './components/PerformanceLeaderboard';
 import QcDashboard from './components/QcDashboard';
 import AdminSettings from './components/AdminSettings';
-
-import { SyncProvider } from './context/SyncContext';
 import SyncDataPage from './components/SyncDataPage';
+import Login from './components/Login'; 
+import ProtectedRoute from './components/ProtectedRoute'; 
+import { SyncProvider } from './context/SyncContext';
 
 const queryClient = new QueryClient();
 
 export default function App() {
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    return localStorage.getItem('theme') === 'dark';
-  });
+  const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
 
   useEffect(() => {
-    if (isDarkMode) {
-      document.body.classList.add('dark-mode');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.body.classList.remove('dark-mode');
-      localStorage.setItem('theme', 'light');
-    }
+    document.body.classList.toggle('dark-mode', isDarkMode);
+    localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
   }, [isDarkMode]);
 
   const toggleTheme = () => setIsDarkMode(!isDarkMode);
@@ -38,25 +32,37 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <SyncProvider>
         <BrowserRouter>
-          <div className="app-container">
-            <Topbar isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
-            <Sidebar />
-            <main className="main-content">
-              <Routes>
-                <Route path="/" element={<Navigate to="/tasks" replace />} />
-                <Route path="/tasks" element={<TaskDashboard />} />
-                <Route path="/dashboard" element={<ProjectDashboard />} />
-                <Route path="/leaderboard" element={<AcceptanceLeaderboard />} />
-                <Route path="/performance" element={<PerformanceLeaderboard />} />
-                <Route path="/qc" element={<QcDashboard />} />
-                <Route path="/teams" element={<TeamManagement />} />
+          <Routes>
+            {/* PUBLIC ROUTE */}
+            <Route path="/login" element={<Login />} />
 
-                {/* Add Settings & Sync Routes */}
-                <Route path="/settings" element={<AdminSettings />} />
-                <Route path="/sync" element={<SyncDataPage />} />
-              </Routes>
-            </main>
-          </div>
+            {/* PROTECTED APP LAYOUT */}
+            <Route path="/*" element={
+              <ProtectedRoute>
+                <div className="app-container">
+                  <Topbar isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
+                  <Sidebar />
+                  <main className="main-content">
+                    <Routes>
+                      <Route path="/" element={<Navigate to="/tasks" replace />} />
+                      
+                      {/* STANDARD USER ROUTES */}
+                      <Route path="/tasks" element={<TaskDashboard />} />
+                      <Route path="/dashboard" element={<ProjectDashboard />} />
+                      <Route path="/leaderboard" element={<AcceptanceLeaderboard />} />
+                      <Route path="/performance" element={<PerformanceLeaderboard />} />
+                      <Route path="/qc" element={<QcDashboard />} />
+
+                      {/* ADMIN ONLY ROUTES */}
+                      <Route path="/teams" element={<ProtectedRoute adminOnly><TeamManagement /></ProtectedRoute>} />
+                      <Route path="/settings" element={<ProtectedRoute adminOnly><AdminSettings /></ProtectedRoute>} />
+                      <Route path="/sync" element={<ProtectedRoute adminOnly><SyncDataPage /></ProtectedRoute>} />
+                    </Routes>
+                  </main>
+                </div>
+              </ProtectedRoute>
+            } />
+          </Routes>
         </BrowserRouter>
       </SyncProvider>
     </QueryClientProvider>

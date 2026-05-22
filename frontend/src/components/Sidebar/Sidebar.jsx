@@ -5,6 +5,11 @@ import './Sidebar.css';
 export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
+  
+  // Get role to secure the sidebar UI
+  const userString = localStorage.getItem('user');
+  const user = userString ? JSON.parse(userString) : null;
+  const isAdmin = user?.role === 'ADMIN';
 
   return (
     <aside className="sidebar">
@@ -12,7 +17,6 @@ export default function Sidebar() {
       <div className="sidebar-section">
         <div className="sidebar-title">Projects</div>
         
-        {/* Unified Tasks Button */}
         <button
           className={`nav-button ${location.pathname === '/tasks' ? 'active' : ''}`}
           onClick={() => navigate('/tasks')}
@@ -58,35 +62,36 @@ export default function Sidebar() {
         </button>
       </div>
 
-      <div className="sidebar-section" style={{ marginTop: '32px' }}>
-        <div className="sidebar-title">Management</div>
-        
-        <button
-          className={`nav-button ${location.pathname === '/teams' ? 'active' : ''}`}
-          onClick={() => navigate('/teams')}
-        >
-          <Users size={18} className="nav-icon" />
-          <span>Team Management</span>
-        </button>
+      {/* --- MANAGEMENT SECTION: ONLY FOR ADMINS --- */}
+      {isAdmin && (
+        <div className="sidebar-section" style={{ marginTop: '32px' }}>
+          <div className="sidebar-title">Management</div>
+          
+          <button
+            className={`nav-button ${location.pathname === '/teams' ? 'active' : ''}`}
+            onClick={() => navigate('/teams')}
+          >
+            <Users size={18} className="nav-icon" />
+            <span>Team Management</span>
+          </button>
 
-        {/* New Data Sync Button */}
-        <button
-          className={`nav-button ${location.pathname === '/sync' ? 'active' : ''}`}
-          onClick={() => navigate('/sync')}
-        >
-          <Database size={18} className="nav-icon" />
-          <span>Data Sync</span>
-        </button>
+          <button
+            className={`nav-button ${location.pathname === '/sync' ? 'active' : ''}`}
+            onClick={() => navigate('/sync')}
+          >
+            <Database size={18} className="nav-icon" />
+            <span>Data Sync</span>
+          </button>
 
-        {/* Admin Settings Button */}
-        <button
-          className={`nav-button ${location.pathname === '/settings' ? 'active' : ''}`}
-          onClick={() => navigate('/settings')}
-        >
-          <Settings size={18} className="nav-icon" />
-          <span>Admin Settings</span>
-        </button>
-      </div>
+          <button
+            className={`nav-button ${location.pathname === '/settings' ? 'active' : ''}`}
+            onClick={() => navigate('/settings')}
+          >
+            <Settings size={18} className="nav-icon" />
+            <span>Admin Settings</span>
+          </button>
+        </div>
+      )}
 
     </aside>
   );

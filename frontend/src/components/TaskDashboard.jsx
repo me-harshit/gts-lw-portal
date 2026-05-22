@@ -13,9 +13,9 @@ const ProgressBar = ({ pulled, total }) => {
   return (
     <div style={{ minWidth: '150px' }}>
       <div className="progress-track">
-        <div style={{ 
+        <div style={{
           width: `${Math.min(percentage, 100)}%`,
-          backgroundColor: barColor, 
+          backgroundColor: barColor,
           height: '100%',
           transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
         }} />
@@ -28,19 +28,19 @@ const ProgressBar = ({ pulled, total }) => {
 };
 
 export default function TaskDashboard() {
-  const [activeTab, setActiveTab] = useState('OFFICE'); 
+  const [activeTab, setActiveTab] = useState('OFFICE');
   const [activeFilter, setActiveFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedRows, setExpandedRows] = useState(new Set());
 
   // Fetch from our local MongoDB API
   const { data: allTasks = [], isLoading, isError } = useQuery({
-    queryKey: ['tasks'], 
+    queryKey: ['tasks'],
     queryFn: async () => {
-        const res = await axios.get(`${API_URL}/api/tasks`);
-        return res.data;
+      const res = await axios.get(`${API_URL}/api/tasks`);
+      return res.data;
     },
-    refetchOnWindowFocus: false 
+    refetchOnWindowFocus: false
   });
 
   if (isLoading) return <div style={{ color: 'var(--text-main)', padding: '20px' }}>Loading tasks...</div>;
@@ -65,6 +65,7 @@ export default function TaskDashboard() {
   };
 
   // 3. Apply Status & Search Filters
+  // 3. Apply Status & Search Filters & Sorting
   const filteredTasks = tabTasks.filter(task => {
     let passesFilter = true;
     if (activeFilter === 'NOT_STARTED') passesFilter = task.pulledNum === 0;
@@ -77,30 +78,49 @@ export default function TaskDashboard() {
       passesSearch = task.taskName.toLowerCase().includes(query) || task.taskId.includes(query);
     }
     return passesFilter && passesSearch;
+  }).sort((a, b) => {
+    const getStatusRank = (t) => {
+      if (t.pulledNum >= t.totalNum) return 1; // Completed
+      if (t.pulledNum > 0) return 2;          // Ongoing
+      return 3;                               // Not Started
+    };
+
+    const rankA = getStatusRank(a);
+    const rankB = getStatusRank(b);
+
+    // If both are in the same status group, sort by completion percentage
+    if (rankA === rankB) {
+      const percA = a.totalNum > 0 ? (a.pulledNum / a.totalNum) : 0;
+      const percB = b.totalNum > 0 ? (b.pulledNum / b.totalNum) : 0;
+      return percB - percA; // Descending: Higher percentage first
+    }
+
+    // Otherwise sort by status rank
+    return rankA - rankB;
   });
 
   return (
     <div className="dashboard-card">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <h2 className="dashboard-header" style={{ margin: 0 }}>Task Management</h2>
+        <h2 className="dashboard-header" style={{ margin: 0 }}>Task Management</h2>
       </div>
 
       {/* --- UNIFIED TABS --- */}
       <div style={{ display: 'flex', gap: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '24px' }}>
-          <button 
-              onClick={() => { setActiveTab('OFFICE'); setActiveFilter('ALL'); setSearchQuery(''); }}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '600', transition: 'all 0.2s', background: activeTab === 'OFFICE' ? 'rgba(59, 130, 246, 0.1)' : 'transparent', color: activeTab === 'OFFICE' ? 'var(--primary)' : 'var(--text-muted)' }}
-          >
-              <Building2 size={18} />
-              Office Tasks
-          </button>
-          <button 
-              onClick={() => { setActiveTab('HOUSE'); setActiveFilter('ALL'); setSearchQuery(''); }}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '600', transition: 'all 0.2s', background: activeTab === 'HOUSE' ? 'rgba(59, 130, 246, 0.1)' : 'transparent', color: activeTab === 'HOUSE' ? 'var(--primary)' : 'var(--text-muted)' }}
-          >
-              <Home size={18} />
-              House Tasks
-          </button>
+        <button
+          onClick={() => { setActiveTab('OFFICE'); setActiveFilter('ALL'); setSearchQuery(''); }}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '600', transition: 'all 0.2s', background: activeTab === 'OFFICE' ? 'rgba(59, 130, 246, 0.1)' : 'transparent', color: activeTab === 'OFFICE' ? 'var(--primary)' : 'var(--text-muted)' }}
+        >
+          <Building2 size={18} />
+          Office Tasks
+        </button>
+        <button
+          onClick={() => { setActiveTab('HOUSE'); setActiveFilter('ALL'); setSearchQuery(''); }}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '600', transition: 'all 0.2s', background: activeTab === 'HOUSE' ? 'rgba(59, 130, 246, 0.1)' : 'transparent', color: activeTab === 'HOUSE' ? 'var(--primary)' : 'var(--text-muted)' }}
+        >
+          <Home size={18} />
+          House Tasks
+        </button>
       </div>
 
       <div className="summary-cards">
@@ -125,16 +145,16 @@ export default function TaskDashboard() {
       <div className="dashboard-controls">
         <div className="search-wrapper">
           <Search className="search-icon" size={18} />
-          <input 
-            type="text" 
-            className="search-input" 
-            placeholder="Search by ID or Name..." 
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Search by ID or Name..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
       </div>
-      
+
       <table className="task-table">
         <thead>
           <tr>
@@ -147,58 +167,58 @@ export default function TaskDashboard() {
         </thead>
         <tbody>
           {filteredTasks.length === 0 ? (
-              <tr><td colSpan="5" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No tasks found in database. Update configuration in Admin Settings and run Data Sync.</td></tr>
+            <tr><td colSpan="5" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No tasks found in database. Update configuration in Admin Settings and run Data Sync.</td></tr>
           ) : (
-              filteredTasks.map((task) => {
-                const isExpanded = expandedRows.has(task.uuid);
+            filteredTasks.map((task) => {
+              const isExpanded = expandedRows.has(task.uuid);
 
-                return (
-                  <Fragment key={task.uuid}>
-                    <tr style={{ borderBottom: isExpanded ? 'none' : '1px solid var(--border-color)' }}>
-                      <td>
-                        <button className="expand-btn" onClick={() => toggleRow(task.uuid)}>
-                          {isExpanded ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
-                        </button>
-                      </td>
-                      <td style={{ fontWeight: '600' }}>{task.taskId}</td>
-                      <td>
-                        <span className="task-name" style={{ color: 'var(--text-main)' }}>{task.taskName}</span>
-                        <span className="task-desc" style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{task.description}</span>
-                      </td>
-                      <td><ProgressBar pulled={task.pulledNum} total={task.totalNum} /></td>
-                      <td><span className="status-badge" style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '12px', background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>{task.status}</span></td>
-                    </tr>
+              return (
+                <Fragment key={task.uuid}>
+                  <tr style={{ borderBottom: isExpanded ? 'none' : '1px solid var(--border-color)' }}>
+                    <td>
+                      <button className="expand-btn" onClick={() => toggleRow(task.uuid)}>
+                        {isExpanded ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+                      </button>
+                    </td>
+                    <td style={{ fontWeight: '600' }}>{task.taskId}</td>
+                    <td>
+                      <span className="task-name" style={{ color: 'var(--text-main)' }}>{task.taskName}</span>
+                      <span className="task-desc" style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{task.description}</span>
+                    </td>
+                    <td><ProgressBar pulled={task.pulledNum} total={task.totalNum} /></td>
+                    <td><span className="status-badge" style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '12px', background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>{task.status}</span></td>
+                  </tr>
 
-                    <tr className="expanded-content-row">
-                      <td colSpan="5" style={{ padding: 0, border: 'none' }}>
-                        <div className={`expand-wrapper ${isExpanded ? 'open' : ''}`}>
-                          <div className="expand-inner">
-                            <div className="expand-layout">
-                              
-                              <div className="meta-box">
-                                <div className="meta-box-header">
-                                  <div className="meta-icon-wrapper"><Flag size={18} /></div>
-                                  Initial Status
-                                </div>
-                                <div className="meta-box-text">{task.initialData}</div>
+                  <tr className="expanded-content-row">
+                    <td colSpan="5" style={{ padding: 0, border: 'none' }}>
+                      <div className={`expand-wrapper ${isExpanded ? 'open' : ''}`}>
+                        <div className="expand-inner">
+                          <div className="expand-layout">
+
+                            <div className="meta-box">
+                              <div className="meta-box-header">
+                                <div className="meta-icon-wrapper"><Flag size={18} /></div>
+                                Initial Status
                               </div>
-
-                              <div className="meta-box">
-                                <div className="meta-box-header">
-                                  <div className="meta-icon-wrapper"><Target size={18} /></div>
-                                  Goal
-                                </div>
-                                <div className="meta-box-text">{task.goalData}</div>
-                              </div>
-
+                              <div className="meta-box-text">{task.initialData}</div>
                             </div>
+
+                            <div className="meta-box">
+                              <div className="meta-box-header">
+                                <div className="meta-icon-wrapper"><Target size={18} /></div>
+                                Goal
+                              </div>
+                              <div className="meta-box-text">{task.goalData}</div>
+                            </div>
+
                           </div>
                         </div>
-                      </td>
-                    </tr>
-                  </Fragment>
-                );
-              })
+                      </div>
+                    </td>
+                  </tr>
+                </Fragment>
+              );
+            })
           )}
         </tbody>
       </table>

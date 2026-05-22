@@ -1,14 +1,31 @@
-import { Moon, Sun, Bell, Box, Loader2, CheckCircle, AlertCircle, Layers, ShieldAlert } from 'lucide-react';
+import { Moon, Sun, Bell, Box, Loader2, CheckCircle, AlertCircle, Layers, ShieldAlert, LogOut } from 'lucide-react';
 import { useSync } from '../../context/SyncContext'; 
+import axios from 'axios';
+import { API_URL } from '../../config/constants';
 import './Topbar.css';
 
 export default function Topbar({ isDarkMode, toggleTheme }) {
     const { syncState, syncMessage, progress, syncType, lastSyncTimes } = useSync();
 
-    // Helper to format the time cleanly (e.g., "12:45 PM")
+    // Get user info from localStorage
+    const userString = localStorage.getItem('user');
+    const user = userString ? JSON.parse(userString) : null;
+    const userInitial = user?.username ? user.username.charAt(0).toUpperCase() : 'U';
+
     const formatShortTime = (isoString) => {
         if (!isoString) return 'Never';
         return new Date(isoString).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
+    };
+
+    const handleLogout = async () => {
+        try {
+            await axios.post(`${API_URL}/api/auth/logout`, {}, { withCredentials: true });
+        } catch (err) {
+            console.error("Logout error", err);
+        } finally {
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+        }
     };
 
     return (
@@ -43,7 +60,6 @@ export default function Topbar({ isDarkMode, toggleTheme }) {
 
             <div className="topbar-right">
                 
-                {/* --- NEW: GLOBAL SYNC TIMESTAMPS --- */}
                 <div className="topbar-timestamps">
                     <div className="timestamp-item" title="Last Task Sync">
                         <Layers size={14} className="timestamp-icon task" />
@@ -72,9 +88,14 @@ export default function Topbar({ isDarkMode, toggleTheme }) {
                     </div>
                 </button>
                 
-                <div className="avatar">A</div>
+                {/* Dynamic Avatar */}
+                <div className="avatar" title={user?.username}>{userInitial}</div>
+
+                {/* Logout Button */}
+                <button className="icon-btn" onClick={handleLogout} title="Logout" style={{ marginLeft: '4px', color: '#ef4444' }}>
+                    <LogOut size={20} />
+                </button>
             </div>
-            
         </header>
     );
 }
