@@ -33,7 +33,10 @@ export function SyncProvider({ children }) {
 
     // 2. SOCKET.IO GLOBAL LISTENER
     useEffect(() => {
-        const socket = io(API_URL, { withCredentials: true });
+        const socket = io(API_URL, { 
+            withCredentials: true,
+            transports: ['websocket'] 
+        });
 
         // --- NEW: CONNECTION RADAR ---
         socket.on('connect', () => {
