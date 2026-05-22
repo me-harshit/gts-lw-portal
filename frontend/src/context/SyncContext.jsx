@@ -35,6 +35,16 @@ export function SyncProvider({ children }) {
     useEffect(() => {
         const socket = io(API_URL, { withCredentials: true });
 
+        // --- NEW: CONNECTION RADAR ---
+        socket.on('connect', () => {
+            console.log("🟢 SOCKET CONNECTED SUCCESSFULLY! URL:", API_URL, "ID:", socket.id);
+        });
+
+        socket.on('connect_error', (err) => {
+            console.error("🔴 SOCKET CONNECTION FAILED URL:", API_URL, "Error:", err.message);
+        });
+        // -----------------------------
+
         // Listen for ongoing progress
         socket.on('sync_update', (state) => {
             if (state.isSyncing) {
@@ -51,7 +61,7 @@ export function SyncProvider({ children }) {
             setSyncMessage(state.message);
             setProgress(state.progress);
             fetchLastSyncTimes(); // Refresh timestamps globally!
-            
+
             setTimeout(() => resetSync(), 5000);
         });
 
@@ -100,10 +110,10 @@ export function SyncProvider({ children }) {
     };
 
     return (
-        <SyncContext.Provider value={{ 
-            syncState, syncType, syncMessage, progress, 
-            lastSyncTimes, 
-            startTaskSync, startQcSync, startTranslation 
+        <SyncContext.Provider value={{
+            syncState, syncType, syncMessage, progress,
+            lastSyncTimes,
+            startTaskSync, startQcSync, startTranslation
         }}>
             {children}
         </SyncContext.Provider>
