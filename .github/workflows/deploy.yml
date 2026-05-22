@@ -20,23 +20,25 @@ jobs:
           script: |
             echo "Deploying to Interserver..."
             
-            # 1. Navigate to the app directory we created
+            # 1. Navigate to the app directory
             cd /var/www/gts-portal
             
             # 2. Discard any local changes on the server and pull fresh code
-            git reset --hard
-            git pull origin gts-lw
+            git fetch origin
+            git reset --hard origin/gts-lw
             
-            # 3. (Optional) Backend Restart
-            # Uncomment these when you are ready to auto-restart the backend
-            # cd backend
-            # npm install
-            # pm2 restart server # Or whatever your pm2 process is named
+            # 3. Build & Restart Backend
+            echo "Building Backend..."
+            cd backend
+            npm install
+            pm2 restart gts-backend
+            pm2 save
             
-            # 4. (Optional) Frontend Build
-            # Uncomment these when you are ready to auto-build the React app
-            # cd ../frontend
-            # npm install
-            # npm run build
+            # 4. Build Frontend
+            echo "Building Frontend..."
+            cd ../frontend
+            export VITE_API_URL=https://lw.gts.ai # Inject production URL
+            npm install
+            npm run build
             
-            echo "Deployment successful!"
+            echo "Deployment and Build successful!"
