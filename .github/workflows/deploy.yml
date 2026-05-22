@@ -31,7 +31,7 @@ jobs:
             echo "Building Backend..."
             cd backend
             npm install
-            pm2 restart gts-backend
+            pm2 reload gts-backend
             pm2 save
             
             # 4. Build Frontend
