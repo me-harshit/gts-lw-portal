@@ -23,6 +23,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.6.2",
     "node-cache": "^5.1.2",
+    "node-cron": "^4.2.1",
     "socket.io": "^4.8.3",
     "unzipper": "^0.12.3"
   }
