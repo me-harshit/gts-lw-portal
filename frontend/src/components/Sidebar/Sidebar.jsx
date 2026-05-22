@@ -66,7 +66,7 @@ export default function Sidebar() {
           onClick={() => navigate('/qc-leaderboard')}
         >
           <Zap size={18} className="nav-icon" />
-          <span>QC Leaderboard</span>
+          <span>QC Score</span>
         </button>
       </div>
 

@@ -112,8 +112,11 @@ export default function QcLeaderboard() {
             const teamInfo = teamMappings.find(t => t.username === producer.username);
             return { ...producer, teamName: teamInfo ? teamInfo.teamName : 'Unknown' };
         })
-        // Sort by Acceptance Rate (descending)
-        .sort((a, b) => parseFloat(b.passRate) - parseFloat(a.passRate));
+        .sort((a, b) => {
+            const rateDiff = parseFloat(b.passRate) - parseFloat(a.passRate);
+            if (rateDiff !== 0) return rateDiff;
+            return b.totalDuration - a.totalDuration; // Secondary sort
+        });
 
     // 2. Now filter that ranked data
     const filteredLeaderboard = rankedData.filter(p => {
@@ -178,40 +181,65 @@ export default function QcLeaderboard() {
 
                                 return (
                                     <tr key={producer.username}>
+                                        {/* RANK */}
                                         <td>
                                             <span className={`rank-badge rank-${originalRank}`}>{originalRank}</span>
                                         </td>
+
+                                        {/* PRODUCER INFO */}
                                         <td>
                                             <div className="producer-name">{producer.username}</div>
                                             <div className="producer-team">{producer.teamName}</div>
                                         </td>
+
+                                        {/* TOTAL VOLUME */}
                                         <td>
                                             <div className="stat-primary">{producer.totalVideos.toLocaleString()}</div>
                                             <div className="stat-secondary">{formatDuration(producer.totalDuration)}</div>
                                         </td>
+
+                                        {/* QC DONE */}
                                         <td>
                                             <div className="stat-primary" style={{ color: '#3b82f6' }}>{producer.checkedVideos.toLocaleString()}</div>
                                             <div className="stat-secondary">{formatDuration(producer.checkedDuration)}</div>
                                         </td>
+
+                                        {/* ACCEPTED (PRIMARY METRIC) */}
                                         <td>
-                                            <div className="stat-primary" style={{ color: '#10b981' }}>{producer.passedVideos.toLocaleString()}</div>
-                                            <div className="stat-secondary">{formatDuration(producer.passedDuration)}</div>
-                                            {producer.checkedVideos > 0 && (
-                                                <div className="stat-tertiary" style={{ color: rankInfo.color, fontWeight: 'bold' }}>
-                                                    {producer.passRate}%
-                                                    {/* <div style={{ fontSize: '10px', opacity: 0.8 }}>{rankInfo.label}</div> */}
-                                                </div>
-                                            )}
+                                            <div style={{ fontSize: '16px', fontWeight: '800', color: rankInfo.color }}>
+                                                {producer.passRate}%
+                                            </div>
+                                            {/* <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase' }}>
+                                                {rankInfo.label}
+                                            </div> */}
+                                            <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-main)', fontWeight: '600' }}>
+                                                {producer.passedVideos.toLocaleString()} vids
+                                            </div>
+                                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                                {formatDuration(producer.passedDuration)}
+                                            </div>
                                         </td>
+
+                                        {/* REJECTED */}
                                         <td>
-                                            <div className="stat-primary" style={{ color: '#ef4444' }}>{producer.failedVideos.toLocaleString()}</div>
-                                            <div className="stat-secondary">{formatDuration(producer.failedDuration)}</div>
-                                            {producer.checkedVideos > 0 && <div className="stat-tertiary">{producer.failRate}%</div>}
+                                            <div style={{ fontSize: '16px', fontWeight: '700', color: '#ef4444' }}>{producer.failRate}%</div>
+                                            <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-main)', fontWeight: '600' }}>
+                                                {producer.failedVideos.toLocaleString()} vids
+                                            </div>
+                                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                                {formatDuration(producer.failedDuration)}
+                                            </div>
                                         </td>
+
+                                        {/* WAITING */}
                                         <td>
-                                            <div className="stat-primary" style={{ color: '#f59e0b' }}>{producer.waitingVideos.toLocaleString()}</div>
-                                            <div className="stat-secondary">{formatDuration(producer.waitingDuration)}</div>
-                                            {producer.totalVideos > 0 && <div className="stat-tertiary">{producer.waitRate}%</div>}
+                                            <div style={{ fontSize: '16px', fontWeight: '700', color: '#f59e0b' }}>{producer.waitRate}%</div>
+                                            <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-main)', fontWeight: '600' }}>
+                                                {producer.waitingVideos.toLocaleString()} vids
+                                            </div>
+                                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                                {formatDuration(producer.waitingDuration)}
+                                            </div>
                                         </td>
                                     </tr>
                                 );
