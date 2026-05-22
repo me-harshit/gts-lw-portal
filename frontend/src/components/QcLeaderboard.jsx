@@ -61,10 +61,10 @@ export default function QcLeaderboard() {
         const today = new Date();
         const formatDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
-        if (type === 'today') { setStart(formatDate(today)); setEnd(formatDate(today)); } 
-        else if (type === 'yesterday') { const y = new Date(today); y.setDate(y.getDate() - 1); setStart(formatDate(y)); setEnd(formatDate(y)); } 
-        else if (type === 'thisWeek') { const m = new Date(today); m.setDate(m.getDate() - (m.getDay() || 7) + 1); setStart(formatDate(m)); setEnd(formatDate(today)); } 
-        else if (type === 'thisMonth') { setStart(formatDate(new Date(today.getFullYear(), today.getMonth(), 1))); setEnd(formatDate(today)); } 
+        if (type === 'today') { setStart(formatDate(today)); setEnd(formatDate(today)); }
+        else if (type === 'yesterday') { const y = new Date(today); y.setDate(y.getDate() - 1); setStart(formatDate(y)); setEnd(formatDate(y)); }
+        else if (type === 'thisWeek') { const m = new Date(today); m.setDate(m.getDate() - (m.getDay() || 7) + 1); setStart(formatDate(m)); setEnd(formatDate(today)); }
+        else if (type === 'thisMonth') { setStart(formatDate(new Date(today.getFullYear(), today.getMonth(), 1))); setEnd(formatDate(today)); }
         else { setStart(''); setEnd(''); }
     };
 
@@ -97,17 +97,30 @@ export default function QcLeaderboard() {
         refetchOnWindowFocus: false
     });
 
-    // Map Teams and Apply Filters
-    const filteredLeaderboard = (rawLeaderboard || [])
+    const getRankColor = (rate) => {
+        const r = parseFloat(rate);
+        if (r >= 90) return { label: 'Excellent', color: '#10b981' };
+        if (r >= 80) return { label: 'Good', color: '#3b82f6' };
+        if (r >= 70) return { label: 'Satisfactory', color: '#f59e0b' };
+        if (r >= 50) return { label: 'Critical', color: '#f59e0b' };
+        return { label: 'Risk', color: '#ef4444' };
+    };
+
+    // 1. Calculate ranks based on the WHOLE data set first
+    const rankedData = (rawLeaderboard || [])
         .map(producer => {
             const teamInfo = teamMappings.find(t => t.username === producer.username);
             return { ...producer, teamName: teamInfo ? teamInfo.teamName : 'Unknown' };
         })
-        .filter(p => {
-            const matchesTeam = teamCategory === 'ALL' || p.teamName === teamCategory;
-            const matchesSearch = p.username.toLowerCase().includes(searchQuery.toLowerCase());
-            return matchesTeam && matchesSearch;
-        });
+        // Sort by Acceptance Rate (descending)
+        .sort((a, b) => parseFloat(b.passRate) - parseFloat(a.passRate));
+
+    // 2. Now filter that ranked data
+    const filteredLeaderboard = rankedData.filter(p => {
+        const matchesTeam = teamCategory === 'ALL' || p.teamName === teamCategory;
+        const matchesSearch = p.username.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchesTeam && matchesSearch;
+    });
 
     return (
         <div className="dashboard-card">
@@ -158,40 +171,51 @@ export default function QcLeaderboard() {
                     </thead>
                     <tbody>
                         {filteredLeaderboard.length > 0 ? (
-                            filteredLeaderboard.map((producer, index) => (
-                                <tr key={producer.username}>
-                                    <td>
-                                        <span className={`rank-badge rank-${index + 1}`}>{index + 1}</span>
-                                    </td>
-                                    <td>
-                                        <div className="producer-name">{producer.username}</div>
-                                        <div className="producer-team">{producer.teamName}</div>
-                                    </td>
-                                    <td>
-                                        <div className="stat-primary">{producer.totalVideos.toLocaleString()}</div>
-                                        <div className="stat-secondary">{formatDuration(producer.totalDuration)}</div>
-                                    </td>
-                                    <td>
-                                        <div className="stat-primary" style={{ color: '#3b82f6' }}>{producer.checkedVideos.toLocaleString()}</div>
-                                        <div className="stat-secondary">{formatDuration(producer.checkedDuration)}</div>
-                                    </td>
-                                    <td>
-                                        <div className="stat-primary" style={{ color: '#10b981' }}>{producer.passedVideos.toLocaleString()}</div>
-                                        <div className="stat-secondary">{formatDuration(producer.passedDuration)}</div>
-                                        {producer.checkedVideos > 0 && <div className="stat-tertiary">{producer.passRate}%</div>}
-                                    </td>
-                                    <td>
-                                        <div className="stat-primary" style={{ color: '#ef4444' }}>{producer.failedVideos.toLocaleString()}</div>
-                                        <div className="stat-secondary">{formatDuration(producer.failedDuration)}</div>
-                                        {producer.checkedVideos > 0 && <div className="stat-tertiary">{producer.failRate}%</div>}
-                                    </td>
-                                    <td>
-                                        <div className="stat-primary" style={{ color: '#f59e0b' }}>{producer.waitingVideos.toLocaleString()}</div>
-                                        <div className="stat-secondary">{formatDuration(producer.waitingDuration)}</div>
-                                        {producer.totalVideos > 0 && <div className="stat-tertiary">{producer.waitRate}%</div>}
-                                    </td>
-                                </tr>
-                            ))
+                            filteredLeaderboard.map((producer) => {
+                                // Find the permanent rank from the full ranked list
+                                const originalRank = rankedData.findIndex(p => p.username === producer.username) + 1;
+                                const rankInfo = getRankColor(producer.passRate);
+
+                                return (
+                                    <tr key={producer.username}>
+                                        <td>
+                                            <span className={`rank-badge rank-${originalRank}`}>{originalRank}</span>
+                                        </td>
+                                        <td>
+                                            <div className="producer-name">{producer.username}</div>
+                                            <div className="producer-team">{producer.teamName}</div>
+                                        </td>
+                                        <td>
+                                            <div className="stat-primary">{producer.totalVideos.toLocaleString()}</div>
+                                            <div className="stat-secondary">{formatDuration(producer.totalDuration)}</div>
+                                        </td>
+                                        <td>
+                                            <div className="stat-primary" style={{ color: '#3b82f6' }}>{producer.checkedVideos.toLocaleString()}</div>
+                                            <div className="stat-secondary">{formatDuration(producer.checkedDuration)}</div>
+                                        </td>
+                                        <td>
+                                            <div className="stat-primary" style={{ color: '#10b981' }}>{producer.passedVideos.toLocaleString()}</div>
+                                            <div className="stat-secondary">{formatDuration(producer.passedDuration)}</div>
+                                            {producer.checkedVideos > 0 && (
+                                                <div className="stat-tertiary" style={{ color: rankInfo.color, fontWeight: 'bold' }}>
+                                                    {producer.passRate}%
+                                                    {/* <div style={{ fontSize: '10px', opacity: 0.8 }}>{rankInfo.label}</div> */}
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td>
+                                            <div className="stat-primary" style={{ color: '#ef4444' }}>{producer.failedVideos.toLocaleString()}</div>
+                                            <div className="stat-secondary">{formatDuration(producer.failedDuration)}</div>
+                                            {producer.checkedVideos > 0 && <div className="stat-tertiary">{producer.failRate}%</div>}
+                                        </td>
+                                        <td>
+                                            <div className="stat-primary" style={{ color: '#f59e0b' }}>{producer.waitingVideos.toLocaleString()}</div>
+                                            <div className="stat-secondary">{formatDuration(producer.waitingDuration)}</div>
+                                            {producer.totalVideos > 0 && <div className="stat-tertiary">{producer.waitRate}%</div>}
+                                        </td>
+                                    </tr>
+                                );
+                            })
                         ) : (
                             <tr>
                                 <td colSpan="7" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
