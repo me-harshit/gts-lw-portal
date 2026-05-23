@@ -222,7 +222,7 @@ export const triggerTranslation = async (req, res) => {
     }
 
     translationState.isRunning = true;
-    cancelTranslationFlag = false; // Reset the flag when starting!
+    cancelTranslationFlag = false;
     translationState.processed = 0;
     translationState.total = 0;
     translationState.speed = 0;
@@ -254,11 +254,13 @@ export const triggerTranslation = async (req, res) => {
             const startTime = Date.now();
             let processedCount = 0;
             let errorCount = 0;
+            let consecutiveChunkFailures = 0;
 
-            const CHUNK_SIZE = 5;
+            // Reduced from 5 to 3 to avoid instant IP bans from Google
+            const CHUNK_SIZE = 3;
 
             for (let i = 0; i < totalRecords; i += CHUNK_SIZE) {
-                // --- CHECK THE KILL SWITCH BEFORE NEXT CHUNK ---
+                // Check User Kill Switch
                 if (cancelTranslationFlag) {
                     console.log("🛑 [Translation Engine] Halted by User Command.");
                     translationState.message = 'Halted by User.';
@@ -266,6 +268,7 @@ export const triggerTranslation = async (req, res) => {
                 }
 
                 const chunk = recordsToTranslate.slice(i, i + CHUNK_SIZE);
+                let chunkFailed = true; // Assume failure until one succeeds
 
                 await Promise.all(chunk.map(async (record) => {
                     let updateData = {};
@@ -283,7 +286,13 @@ export const triggerTranslation = async (req, res) => {
 
                             if (record.inspect_issue_description) {
                                 const descRes = await translate(record.inspect_issue_description, { to: 'en' });
-                                updateData.inspect_issue_description_en = descRes.text;
+
+                                // THE INFINITE LOOP FIX: If Google returns the exact same Chinese text, mark it as failed so it clears the queue!
+                                if (descRes.text === record.inspect_issue_description) {
+                                    updateData.inspect_issue_description_en = 'Skipped - Google returned unchanged text';
+                                } else {
+                                    updateData.inspect_issue_description_en = descRes.text;
+                                }
                             }
 
                             if (!updateData.inspect_issue_description_en) {
@@ -295,10 +304,14 @@ export const triggerTranslation = async (req, res) => {
                             }
 
                             success = true;
+                            chunkFailed = false; // At least one record succeeded!
 
                         } catch (err) {
                             if (attempts >= 2) {
                                 errorCount++;
+                                // Print the exact error so you can see if Google is banning you
+                                console.log(`⚠️ ID ${record._id.toString().substring(0, 6)}... Failed: ${err.message}`);
+
                                 await AllRecord.updateOne(
                                     { _id: record._id },
                                     { $set: { inspect_issue_description_en: 'Skipped - API Error' } }
@@ -308,6 +321,13 @@ export const triggerTranslation = async (req, res) => {
                     }
                 }));
 
+                // Auto-Kill Switch if Google blocks your VPS IP
+                if (chunkFailed) {
+                    consecutiveChunkFailures++;
+                } else {
+                    consecutiveChunkFailures = 0;
+                }
+
                 processedCount += chunk.length;
                 translationState.processed = processedCount;
 
@@ -315,20 +335,26 @@ export const triggerTranslation = async (req, res) => {
                 translationState.speed = (processedCount / elapsedSeconds).toFixed(2);
                 broadcastTranslationUpdate(translationState);
 
+                console.log(`⏱️ Progress: ${processedCount}/${totalRecords} | Speed: ${translationState.speed} req/sec | Errors: ${errorCount}`);
+
+                if (consecutiveChunkFailures >= 3) {
+                    console.error("🛑 [Translation Engine] Google API Rate Limited (Multiple chunk failures). Pausing engine to prevent IP Ban.");
+                    translationState.message = 'Paused: Google Rate Limit.';
+                    break;
+                }
+
                 // Wait 2.5 seconds between chunks
                 await new Promise(resolve => setTimeout(resolve, 2500));
             }
 
             translationState.isRunning = false;
-            if (!cancelTranslationFlag) {
+            if (!cancelTranslationFlag && consecutiveChunkFailures < 3) {
                 translationState.message = `Finished with ${errorCount} errors.`;
                 console.log(`✅ [Translation Engine] FINISHED FAST BATCH.`);
             }
             broadcastTranslationUpdate(translationState);
-            isTranslationRunning = false;
 
         } catch (error) {
-            isTranslationRunning = false;
             translationState.isRunning = false;
             translationState.message = 'Fatal System Error.';
             broadcastTranslationUpdate(translationState);

@@ -61,13 +61,7 @@ export default function Sidebar() {
           <span>QC Hub</span>
         </button>
 
-        <button
-          className={`nav-button ${location.pathname === '/qc-leaderboard' ? 'active' : ''}`}
-          onClick={() => navigate('/qc-leaderboard')}
-        >
-          <Zap size={18} className="nav-icon" />
-          <span>QC Score</span>
-        </button>
+        
       </div>
 
       {/* --- MANAGEMENT SECTION: ONLY FOR ADMINS --- */}
