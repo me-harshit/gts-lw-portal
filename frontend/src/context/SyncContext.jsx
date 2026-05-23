@@ -1,16 +1,17 @@
 import { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { io } from 'socket.io-client'; // <-- Import socket.io
+import { io } from 'socket.io-client'; 
 
 const SyncContext = createContext();
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export function SyncProvider({ children }) {
-    const [syncState, setSyncState] = useState('idle'); // 'idle', 'syncing', 'error', 'success'
-    const [syncType, setSyncType] = useState(null); // 'TASK', 'QC', or 'TRANSLATE'
+    const [syncState, setSyncState] = useState('idle'); 
+    const [syncType, setSyncType] = useState(null); 
     const [syncMessage, setSyncMessage] = useState('');
     const [progress, setProgress] = useState(0);
     const [lastSyncTimes, setLastSyncTimes] = useState({ task: null, qc: null });
+    const [translationData, setTranslationData] = useState({ isRunning: false, processed: 0, total: 0, speed: 0, message: '' });
 
     const fetchLastSyncTimes = useCallback(async () => {
         try {
@@ -26,19 +27,16 @@ export function SyncProvider({ children }) {
         }
     }, []);
 
-    // 1. Fetch config on load
     useEffect(() => {
         fetchLastSyncTimes();
     }, [fetchLastSyncTimes]);
 
-    // 2. SOCKET.IO GLOBAL LISTENER
     useEffect(() => {
-        const socket = io(API_URL, { 
+        const socket = io(API_URL, {
             withCredentials: true,
-            transports: ['websocket'] 
+            transports: ['websocket']
         });
 
-        // --- NEW: CONNECTION RADAR ---
         socket.on('connect', () => {
             console.log("🟢 SOCKET CONNECTED SUCCESSFULLY! URL:", API_URL, "ID:", socket.id);
         });
@@ -46,9 +44,11 @@ export function SyncProvider({ children }) {
         socket.on('connect_error', (err) => {
             console.error("🔴 SOCKET CONNECTION FAILED URL:", API_URL, "Error:", err.message);
         });
-        // -----------------------------
 
-        // Listen for ongoing progress
+        socket.on('translation_update', (data) => {
+            setTranslationData(data);
+        });
+
         socket.on('sync_update', (state) => {
             if (state.isSyncing) {
                 setSyncState('syncing');
@@ -58,17 +58,15 @@ export function SyncProvider({ children }) {
             }
         });
 
-        // Listen for successful completion
         socket.on('sync_finished', (state) => {
             setSyncState('success');
             setSyncMessage(state.message);
             setProgress(state.progress);
-            fetchLastSyncTimes(); // Refresh timestamps globally!
+            fetchLastSyncTimes(); 
 
             setTimeout(() => resetSync(), 5000);
         });
 
-        // Listen for global errors
         socket.on('sync_error', (error) => {
             setSyncState('error');
             setSyncMessage(error.message);
@@ -85,13 +83,10 @@ export function SyncProvider({ children }) {
         setSyncType(null);
     };
 
-    // 3. API TRIGGERS (These now just kick off the backend, Socket handles the UI)
     const handleSyncTrigger = async (apiCall) => {
         try {
             await apiCall();
         } catch (error) {
-            // If the backend returns 409 Conflict, it means a sync is already running globally.
-            // We ignore it because the socket is already updating our UI!
             if (error.response?.status !== 409) {
                 setSyncState('error');
                 setSyncMessage(error.response?.data?.error || 'Failed to start sync.');
@@ -112,11 +107,26 @@ export function SyncProvider({ children }) {
         handleSyncTrigger(() => axios.post(`${API_URL}/api/dashboard/translate/start`, { type: 'TRANSLATE' }));
     };
 
+    // --- UPDATED LOGIC HERE ---
+    const stopTranslationEngine = async () => {
+        try {
+            await axios.post(`${API_URL}/api/dashboard/translate/stop`);
+        } catch (error) {
+            if (error.response?.status === 400) {
+                console.log("Engine already commanded to stop or is not running.");
+            } else {
+                console.error("Failed to stop engine", error);
+            }
+        }
+    };
+
     return (
         <SyncContext.Provider value={{
             syncState, syncType, syncMessage, progress,
             lastSyncTimes,
-            startTaskSync, startQcSync, startTranslation
+            translationData,
+            startTaskSync, startQcSync, startTranslation,
+            stopTranslationEngine
         }}>
             {children}
         </SyncContext.Provider>

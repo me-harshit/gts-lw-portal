@@ -5,7 +5,7 @@ import AllRecord from '../models/AllRecords.js';
 import AppConfig from '../models/AppConfig.js';
 import https from 'https';
 import translate from 'google-translate-api-x';
-import { globalSyncState, updateSyncState, finishSync, errorSync } from '../utils/syncLock.js';
+import { globalSyncState, updateSyncState, finishSync, errorSync, broadcastTranslationUpdate } from '../utils/syncLock.js';
 
 const httpsAgent = new https.Agent({
     keepAlive: true,
@@ -179,9 +179,22 @@ export const triggerDashboardSync = async (req, res) => {
     })();
 };
 
-// --- NEW: Private lock just for Translation so it doesn't block the Global Topbar ---
-let isTranslationRunning = false;
+// ============================================================================
+// TRANSLATION ENGINE LOGIC
+// ============================================================================
 
+let isTranslationRunning = false;
+let cancelTranslationFlag = false; // <-- NEW KILL SWITCH FLAG
+
+export const translationState = {
+    isRunning: false,
+    processed: 0,
+    total: 0,
+    speed: 0,
+    message: ''
+};
+
+// The Smart Query: Catches empty EN fields OR EN fields that accidentally contain CN text
 const getTranslationQuery = () => ({
     inspect_result: 'INSPECT_FAILED',
     inspect_issue_description: { $exists: true, $ne: '', $type: 'string' },
@@ -196,20 +209,27 @@ const getTranslationQuery = () => ({
 export const getPendingTranslationCount = async (req, res) => {
     try {
         const count = await AllRecord.countDocuments(getTranslationQuery());
-        res.json({ pendingCount: count });
+        res.json({ pendingCount: count, translationState });
     } catch (error) {
+        console.error("❌ Translation Count Error:", error); // <-- This will catch any DB query errors
         res.status(500).json({ error: 'Failed to count pending translations' });
     }
 };
 
 export const triggerTranslation = async (req, res) => {
-    // Check our private lock instead of globalSyncState
-    if (isTranslationRunning) {
-        return res.status(409).json({ error: 'Translation engine is already running in the background.' });
+    if (translationState.isRunning) {
+        return res.status(409).json({ error: 'Translation engine is already running.' });
     }
 
-    isTranslationRunning = true;
-    res.status(202).json({ message: "Translation Engine started as an invisible background process." });
+    translationState.isRunning = true;
+    cancelTranslationFlag = false; // Reset the flag when starting!
+    translationState.processed = 0;
+    translationState.total = 0;
+    translationState.speed = 0;
+    translationState.message = 'Initializing Batch Engine...';
+    broadcastTranslationUpdate(translationState);
+
+    res.status(202).json({ message: "Translation Engine started in Fast Batch Mode." });
 
     (async () => {
         try {
@@ -219,93 +239,113 @@ export const triggerTranslation = async (req, res) => {
             const totalRecords = recordsToTranslate.length;
 
             if (totalRecords === 0) {
-                isTranslationRunning = false;
+                translationState.isRunning = false;
+                translationState.message = 'No records require translation.';
+                broadcastTranslationUpdate(translationState);
                 return;
             }
 
-            console.log(`\n🚀 [Translation Engine] Starting batch of ${totalRecords} records...`);
+            translationState.total = totalRecords;
+            translationState.message = 'Translating (Fast Mode)...';
+            broadcastTranslationUpdate(translationState);
 
-            // --- TELEMETRY VARIABLES ---
+            console.log(`\n🚀 [Translation Engine] Starting FAST BATCH of ${totalRecords} records...`);
+
             const startTime = Date.now();
             let processedCount = 0;
             let errorCount = 0;
-            let consecutiveFailures = 0;
 
-            for (const record of recordsToTranslate) {
-                let updateData = {};
-                let success = false;
-                let attempts = 0;
+            const CHUNK_SIZE = 5;
 
-                while (attempts < 3 && !success) {
-                    try {
-                        attempts++;
-                        // Be gentle with Google API so you don't get banned
-                        const waitTime = 1000 + (attempts * 1000);
-                        await new Promise(resolve => setTimeout(resolve, waitTime));
-
-                        if (record.data_name) {
-                            const nameRes = await translate(record.data_name, { to: 'en' });
-                            if (nameRes.text !== record.data_name) {
-                                updateData.data_name_en = nameRes.text;
-                            }
-                        }
-
-                        if (record.inspect_issue_description) {
-                            const descRes = await translate(record.inspect_issue_description, { to: 'en' });
-                            updateData.inspect_issue_description_en = descRes.text;
-                        }
-
-                        // If Google returns empty string, force a value so it clears the queue
-                        if (!updateData.inspect_issue_description_en) {
-                            updateData.inspect_issue_description_en = 'No valid description provided.';
-                        }
-
-                        if (Object.keys(updateData).length > 0) {
-                            await AllRecord.updateOne({ _id: record._id }, { $set: updateData });
-                        }
-
-                        success = true;
-                        consecutiveFailures = 0;
-
-                    } catch (err) {
-                        console.warn(`⚠️ [Translation Engine] Attempt ${attempts} failed for ID ${record._id}: ${err.message}`);
-
-                        if (attempts >= 3) {
-                            errorCount++;
-                            consecutiveFailures++;
-                            console.error(`❌ [Translation Engine] Giving up on ID ${record._id}. Marking as Skipped.`);
-
-                            // Mark as failed so it stops retrying this broken record forever
-                            await AllRecord.updateOne(
-                                { _id: record._id },
-                                { $set: { inspect_issue_description_en: 'Skipped - API Error' } }
-                            );
-                        }
-                    }
-                }
-
-                // --- PROGRESS TRACKER ---
-                processedCount++;
-                if (processedCount % 5 === 0 || processedCount === totalRecords) {
-                    const elapsedSeconds = (Date.now() - startTime) / 1000;
-                    const recordsPerSecond = (processedCount / elapsedSeconds).toFixed(2);
-                    console.log(`⏱️ [Translation Engine] Progress: ${processedCount}/${totalRecords} | Speed: ${recordsPerSecond} req/sec | Errors: ${errorCount}`);
-                }
-
-                // Safety Kill-switch
-                if (consecutiveFailures >= 5) {
-                    console.error("🛑 [Translation Engine] Google API Rate Limited (5 consecutive fails). Pausing until next sync.");
+            for (let i = 0; i < totalRecords; i += CHUNK_SIZE) {
+                // --- CHECK THE KILL SWITCH BEFORE NEXT CHUNK ---
+                if (cancelTranslationFlag) {
+                    console.log("🛑 [Translation Engine] Halted by User Command.");
+                    translationState.message = 'Halted by User.';
                     break;
                 }
+
+                const chunk = recordsToTranslate.slice(i, i + CHUNK_SIZE);
+
+                await Promise.all(chunk.map(async (record) => {
+                    let updateData = {};
+                    let success = false;
+                    let attempts = 0;
+
+                    while (attempts < 2 && !success) {
+                        try {
+                            attempts++;
+
+                            if (record.data_name) {
+                                const nameRes = await translate(record.data_name, { to: 'en' });
+                                if (nameRes.text !== record.data_name) updateData.data_name_en = nameRes.text;
+                            }
+
+                            if (record.inspect_issue_description) {
+                                const descRes = await translate(record.inspect_issue_description, { to: 'en' });
+                                updateData.inspect_issue_description_en = descRes.text;
+                            }
+
+                            if (!updateData.inspect_issue_description_en) {
+                                updateData.inspect_issue_description_en = 'No valid description provided.';
+                            }
+
+                            if (Object.keys(updateData).length > 0) {
+                                await AllRecord.updateOne({ _id: record._id }, { $set: updateData });
+                            }
+
+                            success = true;
+
+                        } catch (err) {
+                            if (attempts >= 2) {
+                                errorCount++;
+                                await AllRecord.updateOne(
+                                    { _id: record._id },
+                                    { $set: { inspect_issue_description_en: 'Skipped - API Error' } }
+                                );
+                            }
+                        }
+                    }
+                }));
+
+                processedCount += chunk.length;
+                translationState.processed = processedCount;
+
+                const elapsedSeconds = (Date.now() - startTime) / 1000;
+                translationState.speed = (processedCount / elapsedSeconds).toFixed(2);
+                broadcastTranslationUpdate(translationState);
+
+                // Wait 2.5 seconds between chunks
+                await new Promise(resolve => setTimeout(resolve, 2500));
             }
 
-            const totalTime = ((Date.now() - startTime) / 1000).toFixed(2);
-            console.log(`✅ [Translation Engine] FINISHED. Processed ${processedCount} records in ${totalTime}s. Final errors: ${errorCount}\n`);
+            translationState.isRunning = false;
+            if (!cancelTranslationFlag) {
+                translationState.message = `Finished with ${errorCount} errors.`;
+                console.log(`✅ [Translation Engine] FINISHED FAST BATCH.`);
+            }
+            broadcastTranslationUpdate(translationState);
             isTranslationRunning = false;
 
         } catch (error) {
             isTranslationRunning = false;
-            console.error("🛑 [Translation Engine] Fatal System Error:", error.message);
+            translationState.isRunning = false;
+            translationState.message = 'Fatal System Error.';
+            broadcastTranslationUpdate(translationState);
+            console.error("🛑 [Translation Engine] Fatal System Error:", error);
         }
     })();
+};
+
+// --- NEW FUNCTION TO FLIP THE KILL SWITCH ---
+export const stopTranslation = (req, res) => {
+    if (!translationState.isRunning) {
+        return res.status(400).json({ message: "Engine is not currently running." });
+    }
+
+    cancelTranslationFlag = true;
+    translationState.message = "Stopping Engine...";
+    broadcastTranslationUpdate(translationState);
+
+    res.json({ message: "Stop command sent. Engine will halt after the current chunk." });
 };

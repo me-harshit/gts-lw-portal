@@ -1,5 +1,5 @@
 import express from 'express';
-import { triggerDashboardSync, getPendingTranslationCount, triggerTranslation } from '../controllers/dashboardController.js'; 
+import { triggerDashboardSync, getPendingTranslationCount, triggerTranslation, stopTranslation } from '../controllers/dashboardController.js'; 
 import { getDashboardSummary, getProducerHistory, getQcDetails } from '../controllers/dashboardStatsController.js';
 import { finishSync } from '../utils/syncLock.js';
 
@@ -15,6 +15,7 @@ router.get('/unlock', (req, res) => {
 router.post('/sync', triggerDashboardSync);
 router.get('/translate/pending', getPendingTranslationCount);
 router.post('/translate/start', triggerTranslation);
+router.post('/translate/stop', stopTranslation);
 
 // --- STATS ROUTES ---
 router.get('/stats/summary', getDashboardSummary); 

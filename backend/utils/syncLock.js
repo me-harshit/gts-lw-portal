@@ -36,3 +36,9 @@ export const errorSync = (errorMessage) => {
     
     if (ioInstance) ioInstance.emit('sync_error', { message: errorMessage });
 };
+
+export const broadcastTranslationUpdate = (translationState) => {
+    if (ioInstance) {
+        ioInstance.emit('translation_update', translationState);
+    }
+};

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Database, Layers, ShieldAlert, RefreshCw, Clock, Languages } from 'lucide-react';
+import { Database, Layers, ShieldAlert, RefreshCw, Clock, Languages, XCircle } from 'lucide-react';
 import { useSync } from '../context/SyncContext';
 import { PROJECTS } from '../config/constants';
 import './ProjectDashboard.css';
@@ -10,15 +10,13 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export default function SyncDataPage() {
     const [pendingTranslations, setPendingTranslations] = useState(0);
-    // Bring in lastSyncTimes from the global context
-    const { syncState, syncType, lastSyncTimes, startTaskSync, startQcSync, startTranslation } = useSync();
+    const { syncState, syncType, lastSyncTimes, startTaskSync, startQcSync, startTranslation, translationData, stopTranslationEngine } = useSync();
 
     useEffect(() => {
-        // Fetch pending count dynamically
         axios.get(`${API_URL}/api/dashboard/translate/pending`)
             .then(res => setPendingTranslations(res.data.pendingCount))
             .catch(err => console.error(err));
-    }, [syncState]);
+    }, [syncState, translationData.isRunning]);
 
     const formatTime = (isoString) => {
         if (!isoString) return 'Never synced';
@@ -39,6 +37,13 @@ export default function SyncDataPage() {
         ]);
     };
 
+    const translationPercent = translationData.total > 0
+        ? Math.round((translationData.processed / translationData.total) * 100)
+        : 0;
+
+    // Detect if the stop command is currently resolving
+    const isStopping = translationData.message === "Stopping Engine...";
+
     return (
         <div className="dashboard-card sync-page-container">
             <div className="sync-page-header">
@@ -54,7 +59,6 @@ export default function SyncDataPage() {
             </div>
 
             <div className="sync-grid">
-                
                 {/* --- TASK SYNC CARD --- */}
                 <div className="sync-card">
                     <div className="sync-card-header">
@@ -72,12 +76,12 @@ export default function SyncDataPage() {
                     <p className="sync-card-body">
                         Updates the global dictionary of tasks. Fetches total required videos, current pulled progress, and translates task instructions.
                     </p>
-                    <button 
+                    <button
                         className="sync-action-btn"
                         onClick={handleTaskSync}
                         disabled={syncState === 'syncing'}
                     >
-                        <RefreshCw size={16} className={syncState === 'syncing' && syncType === 'TASK' ? 'spinning' : ''} /> 
+                        <RefreshCw size={16} className={syncState === 'syncing' && syncType === 'TASK' ? 'spinning' : ''} />
                         {syncState === 'syncing' && syncType === 'TASK' ? 'Syncing...' : 'Sync Tasks Now'}
                     </button>
                 </div>
@@ -99,12 +103,12 @@ export default function SyncDataPage() {
                     <p className="sync-card-body">
                         Triggers a massive background export on Lightwheel. Downloads thousands of QC records instantly without translating to save time.
                     </p>
-                    <button 
+                    <button
                         className="sync-action-btn"
                         onClick={handleQcSync}
                         disabled={syncState === 'syncing'}
                     >
-                        <RefreshCw size={16} className={syncState === 'syncing' && syncType === 'QC' ? 'spinning' : ''} /> 
+                        <RefreshCw size={16} className={syncState === 'syncing' && syncType === 'QC' ? 'spinning' : ''} />
                         {syncState === 'syncing' && syncType === 'QC' ? 'Syncing...' : 'Sync QC Records'}
                     </button>
                 </div>
@@ -118,23 +122,61 @@ export default function SyncDataPage() {
                         <div>
                             <h3 className="sync-card-title">Translation Engine</h3>
                             <div className="sync-last-updated" style={{ color: pendingTranslations > 0 ? '#f59e0b' : '#10b981', fontWeight: '600' }}>
-                                Pending Records: {pendingTranslations.toLocaleString()}
+                                Pending Records: {translationData.isRunning ? 'Running...' : pendingTranslations.toLocaleString()}
                             </div>
                         </div>
                     </div>
                     <p className="sync-card-body">
                         Scans the local database for failed QC records that haven't been translated yet. Processes quietly in the background to avoid API bans.
                     </p>
-                    <button 
+
+                    <button
                         className="sync-action-btn"
                         onClick={startTranslation}
-                        disabled={syncState === 'syncing' || pendingTranslations === 0}
+                        disabled={translationData.isRunning || pendingTranslations === 0}
                     >
-                        <RefreshCw size={16} className={syncState === 'syncing' && syncType === 'TRANSLATE' ? 'spinning' : ''} /> 
-                        {pendingTranslations === 0 ? 'Fully Translated' : 'Translate Pending Records'}
+                        <RefreshCw size={16} className={translationData.isRunning ? 'spinning' : ''} />
+                        {translationData.isRunning ? 'Engine Running...' : pendingTranslations === 0 ? 'Fully Translated' : 'Translate Pending Records'}
                     </button>
-                </div>
 
+                    {translationData.isRunning && (
+                        <div style={{ marginTop: '16px', padding: '12px', background: 'var(--bg-main)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span>{translationData.message}</span>
+                                    
+                                    {/* --- UPDATED STOP ICON LOGIC --- */}
+                                    {!isStopping ? (
+                                        <button
+                                            onClick={stopTranslationEngine}
+                                            title="Force Stop Engine"
+                                            style={{
+                                                background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                                                display: 'flex', color: '#ef4444', opacity: 0.8, transition: 'opacity 0.2s'
+                                            }}
+                                            onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
+                                            onMouseLeave={(e) => e.currentTarget.style.opacity = 0.8}
+                                        >
+                                            <XCircle size={16} />
+                                        </button>
+                                    ) : (
+                                        <RefreshCw size={14} className="spinning" style={{ color: '#ef4444', opacity: 0.8 }} />
+                                    )}
+
+                                </div>
+                                <span>{translationData.speed} req/sec</span>
+                            </div>
+
+                            <div style={{ width: '100%', background: 'var(--bg-secondary)', height: '6px', borderRadius: '3px', marginTop: '8px', overflow: 'hidden' }}>
+                                <div style={{ width: `${translationPercent}%`, background: 'var(--primary)', height: '100%', borderRadius: '3px', transition: 'width 0.3s ease' }}></div>
+                            </div>
+
+                            <div style={{ textAlign: 'right', fontSize: '11px', fontWeight: 'bold', marginTop: '6px', color: 'var(--text-main)' }}>
+                                {translationData.processed.toLocaleString()} / {translationData.total.toLocaleString()} ({translationPercent}%)
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
