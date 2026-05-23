@@ -15,7 +15,13 @@ const mockReqRes = (type) => {
 };
 
 export const initCronJobs = () => {
-    console.log("⏰ Initializing Automation Cron Loops...");
+    // --- THE PRO FIX: ENVIRONMENT VARIABLE TOGGLE ---
+    if (process.env.RUN_CRON !== 'true') {
+        console.log("🟡 [Cron] Automation is DISABLED on this instance (RUN_CRON is not 'true').");
+        return; // Exit early, skip scheduling completely
+    }
+
+    console.log("🟢 [Cron] Automation Cron Loops are ENABLED.");
 
     // 1. Task Sync: Every 1 Hour ('0 * * * *')
     cron.schedule('0 * * * *', async () => {

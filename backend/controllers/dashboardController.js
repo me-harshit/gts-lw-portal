@@ -31,7 +31,7 @@ export const triggerDashboardSync = async (req, res) => {
     }
 
     const { projects } = req.body;
-    
+
     updateSyncState({
         isSyncing: true,
         type: 'QC',
@@ -179,15 +179,23 @@ export const triggerDashboardSync = async (req, res) => {
     })();
 };
 
+// --- NEW: Private lock just for Translation so it doesn't block the Global Topbar ---
+let isTranslationRunning = false;
+
+const getTranslationQuery = () => ({
+    inspect_result: 'INSPECT_FAILED',
+    inspect_issue_description: { $exists: true, $ne: '', $type: 'string' },
+    $or: [
+        { inspect_issue_description_en: { $exists: false } },
+        { inspect_issue_description_en: null },
+        { inspect_issue_description_en: '' },
+        { $expr: { $eq: ["$inspect_issue_description", "$inspect_issue_description_en"] } }
+    ]
+});
+
 export const getPendingTranslationCount = async (req, res) => {
     try {
-        const count = await AllRecord.countDocuments({
-            inspect_result: 'INSPECT_FAILED',
-            $or: [
-                { inspect_issue_description_en: { $exists: false } },
-                { inspect_issue_description_en: null }
-            ]
-        });
+        const count = await AllRecord.countDocuments(getTranslationQuery());
         res.json({ pendingCount: count });
     } catch (error) {
         res.status(500).json({ error: 'Failed to count pending translations' });
@@ -195,37 +203,32 @@ export const getPendingTranslationCount = async (req, res) => {
 };
 
 export const triggerTranslation = async (req, res) => {
-    if (globalSyncState.isSyncing) {
-        return res.status(409).json({ error: 'A sync operation is already in progress globally.' });
+    // Check our private lock instead of globalSyncState
+    if (isTranslationRunning) {
+        return res.status(409).json({ error: 'Translation engine is already running in the background.' });
     }
 
-    updateSyncState({
-        isSyncing: true,
-        type: 'TRANSLATE',
-        message: 'Initializing Translation Engine...',
-        progress: 0
-    });
-
-    res.status(202).json({ message: "Translation Queue Started" });
+    isTranslationRunning = true;
+    res.status(202).json({ message: "Translation Engine started as an invisible background process." });
 
     (async () => {
         try {
-            const recordsToTranslate = await AllRecord.find({
-                inspect_result: 'INSPECT_FAILED',
-                $or: [
-                    { inspect_issue_description_en: { $exists: false } },
-                    { inspect_issue_description_en: null }
-                ]
-            }).select('_id data_name inspect_issue_description');
+            const recordsToTranslate = await AllRecord.find(getTranslationQuery())
+                .select('_id data_name inspect_issue_description');
 
-            if (recordsToTranslate.length === 0) {
-                finishSync('No records require translation.');
+            const totalRecords = recordsToTranslate.length;
+
+            if (totalRecords === 0) {
+                isTranslationRunning = false;
                 return;
             }
 
-            updateSyncState({ message: `Translating ${recordsToTranslate.length} records...` });
+            console.log(`\n🚀 [Translation Engine] Starting batch of ${totalRecords} records...`);
 
-            let processed = 0;
+            // --- TELEMETRY VARIABLES ---
+            const startTime = Date.now();
+            let processedCount = 0;
+            let errorCount = 0;
             let consecutiveFailures = 0;
 
             for (const record of recordsToTranslate) {
@@ -236,12 +239,15 @@ export const triggerTranslation = async (req, res) => {
                 while (attempts < 3 && !success) {
                     try {
                         attempts++;
-                        const waitTime = 500 + (attempts * 1000);
-                        await new Promise(resolve => setTimeout(resolve, waitTime)); 
+                        // Be gentle with Google API so you don't get banned
+                        const waitTime = 1000 + (attempts * 1000);
+                        await new Promise(resolve => setTimeout(resolve, waitTime));
 
                         if (record.data_name) {
                             const nameRes = await translate(record.data_name, { to: 'en' });
-                            updateData.data_name_en = nameRes.text;
+                            if (nameRes.text !== record.data_name) {
+                                updateData.data_name_en = nameRes.text;
+                            }
                         }
 
                         if (record.inspect_issue_description) {
@@ -249,34 +255,57 @@ export const triggerTranslation = async (req, res) => {
                             updateData.inspect_issue_description_en = descRes.text;
                         }
 
+                        // If Google returns empty string, force a value so it clears the queue
+                        if (!updateData.inspect_issue_description_en) {
+                            updateData.inspect_issue_description_en = 'No valid description provided.';
+                        }
+
                         if (Object.keys(updateData).length > 0) {
                             await AllRecord.updateOne({ _id: record._id }, { $set: updateData });
                         }
 
                         success = true;
-                        consecutiveFailures = 0; 
+                        consecutiveFailures = 0;
 
                     } catch (err) {
+                        console.warn(`⚠️ [Translation Engine] Attempt ${attempts} failed for ID ${record._id}: ${err.message}`);
+
                         if (attempts >= 3) {
+                            errorCount++;
                             consecutiveFailures++;
+                            console.error(`❌ [Translation Engine] Giving up on ID ${record._id}. Marking as Skipped.`);
+
+                            // Mark as failed so it stops retrying this broken record forever
+                            await AllRecord.updateOne(
+                                { _id: record._id },
+                                { $set: { inspect_issue_description_en: 'Skipped - API Error' } }
+                            );
                         }
                     }
                 }
 
-                processed++;
-                if (processed % 5 === 0) {
-                    updateSyncState({ progress: processed });
+                // --- PROGRESS TRACKER ---
+                processedCount++;
+                if (processedCount % 5 === 0 || processedCount === totalRecords) {
+                    const elapsedSeconds = (Date.now() - startTime) / 1000;
+                    const recordsPerSecond = (processedCount / elapsedSeconds).toFixed(2);
+                    console.log(`⏱️ [Translation Engine] Progress: ${processedCount}/${totalRecords} | Speed: ${recordsPerSecond} req/sec | Errors: ${errorCount}`);
                 }
 
+                // Safety Kill-switch
                 if (consecutiveFailures >= 5) {
-                    throw new Error("Google API Rate Limited. Try again in 30 minutes.");
+                    console.error("🛑 [Translation Engine] Google API Rate Limited (5 consecutive fails). Pausing until next sync.");
+                    break;
                 }
             }
 
-            finishSync('Translation Complete!');
+            const totalTime = ((Date.now() - startTime) / 1000).toFixed(2);
+            console.log(`✅ [Translation Engine] FINISHED. Processed ${processedCount} records in ${totalTime}s. Final errors: ${errorCount}\n`);
+            isTranslationRunning = false;
 
         } catch (error) {
-            errorSync(error.message);
+            isTranslationRunning = false;
+            console.error("🛑 [Translation Engine] Fatal System Error:", error.message);
         }
     })();
 };
