@@ -114,7 +114,69 @@ export default function SyncDataPage() {
                 </div>
 
                 {/* --- TRANSLATION ENGINE CARD --- */}
-               
+                <div className="sync-card">
+                    <div className="sync-card-header">
+                        <div className="sync-icon-wrapper translate">
+                            <Languages size={24} />
+                        </div>
+                        <div>
+                            <h3 className="sync-card-title">Translation Engine</h3>
+                            <div className="sync-last-updated" style={{ color: pendingTranslations > 0 ? '#f59e0b' : '#10b981', fontWeight: '600' }}>
+                                Pending Records: {translationData.isRunning ? 'Running...' : pendingTranslations.toLocaleString()}
+                            </div>
+                        </div>
+                    </div>
+                    <p className="sync-card-body">
+                        Scans the local database for failed QC records that haven't been translated yet. Processes quietly in the background to avoid API bans.
+                    </p>
+
+                    <button
+                        className="sync-action-btn"
+                        onClick={startTranslation}
+                        disabled={translationData.isRunning || pendingTranslations === 0}
+                    >
+                        <RefreshCw size={16} className={translationData.isRunning ? 'spinning' : ''} />
+                        {translationData.isRunning ? 'Engine Running...' : pendingTranslations === 0 ? 'Fully Translated' : 'Translate Pending Records'}
+                    </button>
+
+                    {translationData.isRunning && (
+                        <div style={{ marginTop: '16px', padding: '12px', background: 'var(--bg-main)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span>{translationData.message}</span>
+                                    
+                                    {/* --- UPDATED STOP ICON LOGIC --- */}
+                                    {!isStopping ? (
+                                        <button
+                                            onClick={stopTranslationEngine}
+                                            title="Force Stop Engine"
+                                            style={{
+                                                background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                                                display: 'flex', color: '#ef4444', opacity: 0.8, transition: 'opacity 0.2s'
+                                            }}
+                                            onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
+                                            onMouseLeave={(e) => e.currentTarget.style.opacity = 0.8}
+                                        >
+                                            <XCircle size={16} />
+                                        </button>
+                                    ) : (
+                                        <RefreshCw size={14} className="spinning" style={{ color: '#ef4444', opacity: 0.8 }} />
+                                    )}
+
+                                </div>
+                                <span>{translationData.speed} req/sec</span>
+                            </div>
+
+                            <div style={{ width: '100%', background: 'var(--bg-secondary)', height: '6px', borderRadius: '3px', marginTop: '8px', overflow: 'hidden' }}>
+                                <div style={{ width: `${translationPercent}%`, background: 'var(--primary)', height: '100%', borderRadius: '3px', transition: 'width 0.3s ease' }}></div>
+                            </div>
+
+                            <div style={{ textAlign: 'right', fontSize: '11px', fontWeight: 'bold', marginTop: '6px', color: 'var(--text-main)' }}>
+                                {translationData.processed.toLocaleString()} / {translationData.total.toLocaleString()} ({translationPercent}%)
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
