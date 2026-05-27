@@ -151,3 +151,170 @@
         transform: rotate(360deg);
     }
 }
+
+/* --- UI DIVIDER --- */
+.sync-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 40px 0;
+    width: 100%;
+}
+
+/* --- BOTTOM DASHBOARDS (ANOMALIES & BACKUPS) --- */
+.bottom-dashboards {
+    display: grid;
+    grid-template-columns: 3fr 2fr; /* Anomalies take 60%, Backups take 40% */
+    gap: 24px;
+}
+
+@media (max-width: 1024px) {
+    .bottom-dashboards {
+        grid-template-columns: 1fr; /* Stack on smaller screens */
+    }
+}
+
+.bottom-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+}
+
+.bottom-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.bottom-card-desc {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin-bottom: 20px;
+}
+
+/* --- BADGES & ICONS --- */
+.icon-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+}
+.icon-badge.danger { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+.icon-badge.success { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+
+.anomaly-count {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+/* --- TABLES --- */
+.table-wrapper {
+    background: var(--bg-main);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow-y: auto;
+    max-height: 300px;
+}
+
+.sync-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+}
+
+.sync-table th {
+    padding: 12px 16px;
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.sync-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 13px;
+    vertical-align: middle;
+}
+
+.sync-table tr:hover td {
+    background-color: rgba(59, 130, 246, 0.03);
+}
+
+.data-name-cell {
+    font-family: monospace;
+    color: var(--primary);
+    font-size: 12px;
+}
+
+.status-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+}
+.status-badge.failed { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+.status-badge.passed { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+
+/* --- CREATE BACKUP BUTTON --- */
+.create-backup-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.create-backup-btn:hover:not(:disabled) { background: #2563eb; }
+.create-backup-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* --- TRANSLATION PROGRESS UI CLEANUP --- */
+.translation-progress-box {
+    margin-top: 16px;
+    padding: 12px;
+    background: var(--bg-main);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+.progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+.stop-engine-btn {
+    background: none; border: none; cursor: pointer; padding: 0; display: flex; color: #ef4444; opacity: 0.8; transition: opacity 0.2s;
+}
+.stop-engine-btn:hover { opacity: 1; }
+.progress-track {
+    width: 100%; background: var(--bg-secondary); height: 6px; border-radius: 3px; margin-top: 8px; overflow: hidden;
+}
+.progress-fill {
+    background: var(--primary); height: 100%; border-radius: 3px; transition: width 0.3s ease;
+}
+.progress-stats {
+    text-align: right; font-size: 11px; font-weight: bold; margin-top: 6px; color: var(--text-main);
+}

@@ -1,5 +1,5 @@
 import express from 'express';
-import { triggerDashboardSync, getPendingTranslationCount, triggerTranslation, stopTranslation } from '../controllers/dashboardController.js'; 
+import { triggerDashboardSync, getPendingTranslationCount, triggerTranslation, stopTranslation, getAnomalies } from '../controllers/dashboardController.js'; 
 import { getDashboardSummary, getProducerHistory, getQcDetails } from '../controllers/dashboardStatsController.js';
 import { finishSync } from '../utils/syncLock.js';
 
@@ -23,5 +23,8 @@ router.get('/stats/producer/:username', getProducerHistory);
 
 // --- QC DETAILS ---
 router.get('/stats/qc-details', getQcDetails);
+
+// --- ANOMALIES ---
+router.get('/anomalies', getAnomalies);
 
 export default router;

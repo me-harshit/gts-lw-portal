@@ -126,7 +126,7 @@ export const triggerDashboardSync = async (req, res) => {
                     }
                 }
 
-                updateSyncState({ message: `${prefix}Processing Data...` });
+                updateSyncState({ message: `${prefix}Processing Data & Checking Anomalies...` });
 
                 let batch = [];
                 const parserStream = zipRes.data
@@ -138,31 +138,90 @@ export const triggerDashboardSync = async (req, res) => {
                     return new Date(dateStr.trim().replace(' ', 'T') + 'Z');
                 };
 
+                // --- HELPER TO PROCESS BATCHES WITH ANOMALY DETECTION ---
+                const processBatch = async (rows) => {
+                    if (rows.length === 0) return;
+                    
+                    // 1. Fetch all existing records for this batch at once (MASSIVE SPEED BOOST)
+                    const dataNames = rows.map(r => r.data_name);
+                    const existingRecords = await AllRecord.find({ data_name: { $in: dataNames } }).lean();
+                    
+                    // Convert to a quick lookup map
+                    const existingMap = new Map(existingRecords.map(r => [r.data_name, r]));
+                    const bulkOps = [];
+
+                    for (const row of rows) {
+                        const localRecord = existingMap.get(row.data_name);
+                        let updateDoc = { ...row, project_category: proj.category };
+                        let pushHistory = null;
+                        
+                        // Parse duration safely
+                        const vDuration = parseFloat(row.video_duration) || 0;
+
+                        if (localRecord) {
+                            // --- STATUS CHANGE DETECTED ---
+                            if (localRecord.inspect_result !== row.inspect_result) {
+                                pushHistory = { status: row.inspect_result || 'PENDING', changedAt: new Date() };
+
+                                // 🚨 THE ANOMALY TRAP: PASSED -> FAILED/PENDING
+                                if (localRecord.inspect_result === 'INSPECT_PASSED' && row.inspect_result !== 'INSPECT_PASSED') {
+                                    console.warn(`🚨 [Anomaly] Downgrade Detected: ${row.data_name}`);
+                                    updateDoc.is_downgraded = true; 
+                                }
+                            }
+
+                            // --- NEWLY PASSED DETECTED ---
+                            if (localRecord.inspect_result !== 'INSPECT_PASSED' && row.inspect_result === 'INSPECT_PASSED') {
+                                updateDoc.locked_duration = vDuration;
+                                updateDoc.is_downgraded = false; // Clear flag if it passes again
+                            }
+                        } else {
+                            // --- BRAND NEW RECORD ---
+                            if (row.inspect_result === 'INSPECT_PASSED') {
+                                updateDoc.locked_duration = vDuration;
+                            }
+                            pushHistory = { status: row.inspect_result || 'PENDING', changedAt: new Date() };
+                        }
+
+                        // Prepare the MongoDB query
+                        const updateQuery = { $set: updateDoc };
+                        if (pushHistory) {
+                            updateQuery.$push = { status_history: pushHistory };
+                        }
+
+                        bulkOps.push({
+                            updateOne: {
+                                filter: { data_name: row.data_name },
+                                update: updateQuery,
+                                upsert: true
+                            }
+                        });
+                    }
+
+                    // 2. Execute the smart bulk write
+                    await AllRecord.bulkWrite(bulkOps, { ordered: false });
+                    totalProcessed += rows.length;
+                    updateSyncState({ progress: totalProcessed });
+                };
+
+                // --- STREAM PROCESSING LOOP ---
                 for await (const row of parserStream) {
                     const formattedRow = { ...row };
                     if (formattedRow.start_produce_time) formattedRow.start_produce_time = formatLightwheelDate(formattedRow.start_produce_time);
                     if (formattedRow.inspect_time) formattedRow.inspect_time = formatLightwheelDate(formattedRow.inspect_time);
 
-                    batch.push({
-                        updateOne: {
-                            filter: { data_name: row.data_name },
-                            update: { $set: { ...formattedRow, project_category: proj.category } },
-                            upsert: true
-                        }
-                    });
+                    batch.push(formattedRow);
 
-                    if (batch.length >= 3000) {
-                        await AllRecord.bulkWrite(batch, { ordered: false });
-                        totalProcessed += batch.length;
-                        updateSyncState({ progress: totalProcessed });
+                    // Process in chunks of 1000 to balance memory and query limits
+                    if (batch.length >= 1000) {
+                        await processBatch(batch);
                         batch = [];
                     }
                 }
 
+                // Flush the remaining records
                 if (batch.length > 0) {
-                    await AllRecord.bulkWrite(batch, { ordered: false });
-                    totalProcessed += batch.length;
-                    updateSyncState({ progress: totalProcessed });
+                    await processBatch(batch);
                 }
             }
 
@@ -174,6 +233,7 @@ export const triggerDashboardSync = async (req, res) => {
             finishSync('QC Database Synced Successfully!');
 
         } catch (error) {
+            console.error("QC Sync Error:", error);
             errorSync(error.message);
         }
     })();
@@ -374,4 +434,17 @@ export const stopTranslation = (req, res) => {
     broadcastTranslationUpdate(translationState);
 
     res.json({ message: "Stop command sent. Engine will halt after the current chunk." });
+};
+
+// --- ANOMALY TRACKER FETCH ---
+export const getAnomalies = async (req, res) => {
+    try {
+        const anomalies = await AllRecord.find({ is_downgraded: true })
+            .select('data_name producer project_category locked_duration inspect_result status_history updatedAt')
+            .sort({ updatedAt: -1 });
+        res.json(anomalies);
+    } catch (error) {
+        console.error("Failed to fetch anomalies:", error);
+        res.status(500).json({ error: 'Failed to fetch QC anomalies.' });
+    }
 };

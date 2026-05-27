@@ -13,6 +13,7 @@ import dashboardRoutes from './routes/dashboardRoutes.js';
 import teamRoutes from './routes/teamRoutes.js';
 import leaderboardRoutes from './routes/leaderboardRoutes.js';
 import configRoutes from './routes/configRoutes.js';
+import backupRoutes from './routes/backupRoutes.js';
 
 dotenv.config();
 connectDB();
@@ -55,6 +56,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/leaderboards', leaderboardRoutes);
 app.use('/api/config', configRoutes);
+app.use('/api/backups', backupRoutes);
 
 initCronJobs();
 
