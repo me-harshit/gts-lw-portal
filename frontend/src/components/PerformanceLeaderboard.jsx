@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useQuery } from '@tanstack/react-query';
-import { Filter, Calendar, Loader2, Zap } from 'lucide-react';
+import { Filter, Calendar, Loader2, Zap, Download } from 'lucide-react';
 import { formatDuration } from '../utils/timeFormat';
+import { generateLeaderboardPDF } from '../utils/pdfExport'; // <-- IMPORT EXPORT UTILITY
 import './TaskDashboard.css'; 
 import './PerformanceLeaderboard.css'; 
 
@@ -73,7 +74,6 @@ export default function PerformanceLeaderboard() {
         }
     };
 
-    // Auto-clear active button if manual date is typed
     const handleManualDateChange = (setter, value) => {
         setActiveFilterBtn('');
         setter(value);
@@ -93,17 +93,28 @@ export default function PerformanceLeaderboard() {
         refetchOnWindowFocus: false
     });
 
-    // Extract variables from the backend response format
     const leaderboardRaw = queryResult?.data || [];
-
-    // SORT THE DATA: Top Tier (highest daily average) down to Low Tier
     const leaderboard = [...leaderboardRaw].sort((a, b) => b.dailyAverageSec - a.dailyAverageSec);
 
-    // Summary Calculations
     const totalHoursSec = leaderboard.reduce((acc, curr) => acc + (curr.totalSec || 0), 0) || 0;
     const teamAvgSec = leaderboard.length ? (totalHoursSec / leaderboard.length) : 0;
     const topPerformers = leaderboard.filter(p => p.dailyAverageSec >= 9000).length || 0;
     const lowPerformers = leaderboard.filter(p => p.dailyAverageSec < 6300).length || 0;
+
+    // --- EXPORT HANDLER ---
+    const handleExportPDF = () => {
+        if (leaderboard.length === 0) return;
+        
+        // Map the data to ensure keys match exactly what pdfExport.js expects
+        const mappedData = leaderboard.map(row => ({
+            producer: row.producer,
+            totalDuration: row.totalSec, 
+            dailyAverage: row.dailyAverageSec
+        }));
+
+        const displayTeamName = teamCategory === 'ALL' ? 'GTS Inhouse (All Teams)' : teamCategory;
+        generateLeaderboardPDF(mappedData, startDate, endDate, displayTeamName);
+    };
 
     return (
         <div className="dashboard-card">
@@ -126,7 +137,7 @@ export default function PerformanceLeaderboard() {
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
                     <div className="qc-filter-wrapper">
                         <Calendar size={16} color="var(--text-muted)" />
                         <input 
@@ -150,6 +161,33 @@ export default function PerformanceLeaderboard() {
                             {teams.map(team => <option key={team} value={team}>{team}</option>)}
                         </select>
                     </div>
+
+                    {/* --- NEW PDF EXPORT BUTTON --- */}
+                    <button 
+                        onClick={handleExportPDF}
+                        disabled={leaderboard.length === 0}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            backgroundColor: leaderboard.length === 0 ? 'var(--bg-secondary)' : 'var(--primary)',
+                            color: leaderboard.length === 0 ? 'var(--text-muted)' : 'white',
+                            border: leaderboard.length === 0 ? '1px solid var(--border-color)' : 'none',
+                            padding: '0 16px',
+                            borderRadius: '8px',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            cursor: leaderboard.length === 0 ? 'not-allowed' : 'pointer',
+                            boxShadow: leaderboard.length === 0 ? 'none' : '0 2px 4px rgba(59, 130, 246, 0.3)',
+                            transition: 'all 0.2s',
+                            height: '40px', 
+                        }}
+                        onMouseEnter={(e) => { if(leaderboard.length > 0) e.currentTarget.style.backgroundColor = '#2563eb' }}
+                        onMouseLeave={(e) => { if(leaderboard.length > 0) e.currentTarget.style.backgroundColor = 'var(--primary)' }}
+                    >
+                        <Download size={16} />
+                        Export PDF
+                    </button>
                 </div>
             </div>
 

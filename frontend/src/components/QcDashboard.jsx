@@ -235,13 +235,13 @@ export default function QcDashboard() {
                         onClick={() => { setViewMode('BY_PRODUCER'); setSelectedReason(null); }}
                         style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px', background: viewMode === 'BY_PRODUCER' ? 'var(--primary)' : 'transparent', color: viewMode === 'BY_PRODUCER' ? '#fff' : 'var(--text-muted)', transition: 'all 0.2s' }}
                     >
-                        <User size={14} /> By Producer
+                        <User size={14} /> By Reason
                     </button>
                     <button 
                         onClick={() => { setViewMode('BY_REASON'); setSelectedProducer(null); }}
                         style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px', background: viewMode === 'BY_REASON' ? 'var(--primary)' : 'transparent', color: viewMode === 'BY_REASON' ? '#fff' : 'var(--text-muted)', transition: 'all 0.2s' }}
                     >
-                        <ListFilter size={14} /> By Reason
+                        <ListFilter size={14} /> By Producer
                     </button>
                 </div>
 

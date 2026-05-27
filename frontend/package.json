@@ -12,6 +12,8 @@
   "dependencies": {
     "@tanstack/react-query": "^5.100.9",
     "axios": "^1.16.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "lucide-react": "^1.14.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
