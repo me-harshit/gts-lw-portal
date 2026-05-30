@@ -160,17 +160,11 @@
     width: 100%;
 }
 
-/* --- BOTTOM DASHBOARDS (ANOMALIES & BACKUPS) --- */
+/* --- BOTTOM DASHBOARDS (BACKUPS ONLY) --- */
 .bottom-dashboards {
     display: grid;
-    grid-template-columns: 3fr 2fr; /* Anomalies take 60%, Backups take 40% */
+    grid-template-columns: 1fr; /* Now takes full width */
     gap: 24px;
-}
-
-@media (max-width: 1024px) {
-    .bottom-dashboards {
-        grid-template-columns: 1fr; /* Stack on smaller screens */
-    }
 }
 
 .bottom-card {
@@ -205,17 +199,8 @@
     height: 40px;
     border-radius: 8px;
 }
-.icon-badge.danger { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
-.icon-badge.success { background: rgba(16, 185, 129, 0.1); color: #10b981; }
 
-.anomaly-count {
-    background: rgba(239, 68, 68, 0.1);
-    color: #ef4444;
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 700;
-}
+.icon-badge.success { background: rgba(16, 185, 129, 0.1); color: #10b981; }
 
 /* --- TABLES --- */
 .table-wrapper {
@@ -256,19 +241,12 @@
     background-color: rgba(59, 130, 246, 0.03);
 }
 
-.data-name-cell {
-    font-family: monospace;
-    color: var(--primary);
-    font-size: 12px;
-}
-
 .status-badge {
     padding: 4px 8px;
     border-radius: 4px;
     font-size: 11px;
     font-weight: 700;
 }
-.status-badge.failed { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
 .status-badge.passed { background: rgba(16, 185, 129, 0.1); color: #10b981; }
 
 /* --- CREATE BACKUP BUTTON --- */

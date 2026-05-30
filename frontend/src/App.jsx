@@ -16,6 +16,8 @@ import SyncDataPage from './components/SyncDataPage';
 import Login from './components/Login'; 
 import ProtectedRoute from './components/ProtectedRoute'; 
 import { SyncProvider } from './context/SyncContext';
+import AnomalyDashboard from './components/AnomalyDashboard';
+import AttendanceDashboard from './components/AttendanceDashboard';
 
 const queryClient = new QueryClient();
 
@@ -56,7 +58,9 @@ export default function App() {
                       <Route path="/qc-leaderboard" element={<QcLeaderboard />} />
 
                       {/* ADMIN ONLY ROUTES */}
+                      <Route path="/anomalies" element={<ProtectedRoute adminOnly><AnomalyDashboard /></ProtectedRoute>} />
                       <Route path="/teams" element={<ProtectedRoute adminOnly><TeamManagement /></ProtectedRoute>} />
+                      <Route path="/attendance" element={<ProtectedRoute adminOnly><AttendanceDashboard /></ProtectedRoute>} />
                       <Route path="/settings" element={<ProtectedRoute adminOnly><AdminSettings /></ProtectedRoute>} />
                       <Route path="/sync" element={<ProtectedRoute adminOnly><SyncDataPage /></ProtectedRoute>} />
                     </Routes>

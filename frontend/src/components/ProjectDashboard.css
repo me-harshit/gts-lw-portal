@@ -16,14 +16,14 @@
 /* --- SUMMARY CARDS (Updated for 5 Cards) --- */
 .summary-cards {
     display: flex;
-    flex-wrap: wrap; /* CRITICAL: Allows the 5th card to wrap on small screens */
+    flex-wrap: wrap; 
     gap: 16px;
     margin-bottom: 40px;
 }
 
 .summary-card {
     flex: 1;
-    min-width: 180px; /* Prevents cards from getting too squished */
+    min-width: 180px; 
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: 8px;
@@ -58,13 +58,10 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    
-    /* GLASSMORPHISM TINT: Semi-transparent blue */
     background: rgba(59, 130, 246, 0.08); 
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(59, 130, 246, 0.3); /* Stronger blue border */
-    
+    border: 1px solid rgba(59, 130, 246, 0.3); 
     padding: 8px 14px; 
     border-radius: 8px;
     transition: all 0.2s ease;
@@ -96,38 +93,38 @@
     outline: none;
     cursor: pointer;
     font-size: 14px;
-    font-weight: 600; /* Increased font weight for readability */
+    font-weight: 600; 
     padding-right: 28px; 
     width: 100%;
 }
 
+/* FIX: Ensure native dropdown options are totally solid */
 .qc-filter-select option {
-    background: var(--bg-secondary);
+    background-color: var(--bg-main, #ffffff) !important;
     color: var(--text-main);
     padding: 10px;
+}
+body.dark-mode .qc-filter-select option {
+    background-color: var(--bg-main, #1e1e2d) !important;
 }
 
 /* --- CUSTOM SEARCHABLE DROPDOWN (Producer Analytics) --- */
 .searchable-dropdown-container { 
     position: relative; 
-    width: 320px; 
 }
 
 .searchable-dropdown-header {
     display: flex; align-items: center; justify-content: space-between;
     padding: 8px 12px; 
-    
-    /* GLASSMORPHISM TINT: Semi-transparent blue */
     background: rgba(59, 130, 246, 0.08); 
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     border: 1px solid rgba(59, 130, 246, 0.3);
-    
     border-radius: 8px;
     cursor: pointer; 
     color: var(--text-main); 
     font-size: 14px;
-    font-weight: 600; /* Increased font weight */
+    font-weight: 600; 
     transition: all 0.2s ease; 
     height: 40px; 
     box-sizing: border-box;
@@ -138,36 +135,38 @@
     border-color: rgba(59, 130, 246, 0.5); 
 }
 
+/* FIX: Dropdown Menu completely solid and elevated */
 .searchable-dropdown-menu {
     position: absolute; 
     top: 100%; 
     left: 0; 
     right: 0; 
     margin-top: 8px;
-    
-    /* Heavy separation from background */
-    background: var(--bg-secondary); 
+    background-color: var(--bg-main, #ffffff) !important; /* Solid! */
     border: 1px solid rgba(59, 130, 246, 0.4);
     border-radius: 8px; 
-    
-    /* MASSIVE SHADOW to lift it off the table */
-    box-shadow: 0 12px 40px rgba(0,0,0,0.3), 0 0 0 1px rgba(59, 130, 246, 0.1);
-    
-    z-index: 50; 
+    box-shadow: 0 12px 40px rgba(0,0,0,0.3), 0 0 0 1px rgba(59, 130, 246, 0.1); /* Heavy shadow */
+    z-index: 1000; /* High stack order */
     overflow: hidden;
+}
+
+body.dark-mode .searchable-dropdown-menu {
+    background-color: var(--bg-main, #1e1e2d) !important;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.7);
 }
 
 .searchable-dropdown-search {
     padding: 10px; 
-    background: rgba(59, 130, 246, 0.05); /* Very faint blue inner bg */
+    background: rgba(59, 130, 246, 0.05); 
     border-bottom: 1px solid rgba(59, 130, 246, 0.2); 
     position: relative;
 }
 
+/* FIX: Input must be perfectly solid too */
 .searchable-dropdown-search input {
     width: 100%; 
     padding: 10px 12px 10px 34px; 
-    background: var(--bg-main);
+    background-color: var(--bg-main, #ffffff) !important; /* Solid! */
     border: 1px solid var(--border-color); 
     color: var(--text-main);
     border-radius: 6px; 
@@ -175,6 +174,9 @@
     font-size: 13px; 
     box-sizing: border-box;
     transition: border-color 0.2s ease;
+}
+body.dark-mode .searchable-dropdown-search input {
+    background-color: var(--bg-main, #1e1e2d) !important;
 }
 
 .searchable-dropdown-search input:focus { 

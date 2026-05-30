@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Database, Layers, ShieldAlert, RefreshCw, Clock, Languages, XCircle, AlertTriangle, HardDrive, Download, Archive } from 'lucide-react';
+import { Database, Layers, ShieldAlert, RefreshCw, Clock, Languages, XCircle, HardDrive, Archive } from 'lucide-react';
 import { useSync } from '../context/SyncContext';
 import { PROJECTS } from '../config/constants';
 import './ProjectDashboard.css';
@@ -10,7 +10,6 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export default function SyncDataPage() {
     const [pendingTranslations, setPendingTranslations] = useState(0);
-    const [anomalies, setAnomalies] = useState([]);
     const [backups, setBackups] = useState([]);
     const [isBackingUp, setIsBackingUp] = useState(false);
 
@@ -20,13 +19,11 @@ export default function SyncDataPage() {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [transRes, anomRes, backupRes] = await Promise.all([
+                const [transRes, backupRes] = await Promise.all([
                     axios.get(`${API_URL}/api/dashboard/translate/pending`),
-                    axios.get(`${API_URL}/api/dashboard/anomalies`),
                     axios.get(`${API_URL}/api/backups/list`).catch(() => ({ data: { backups: [] } }))
                 ]);
                 setPendingTranslations(transRes.data.pendingCount);
-                setAnomalies(anomRes.data);
                 setBackups(backupRes.data.backups);
             } catch (err) {
                 console.error("Failed to fetch sync page data:", err);
@@ -150,50 +147,9 @@ export default function SyncDataPage() {
 
             <div className="sync-divider"></div>
 
-            {/* --- BOTTOM DASHBOARDS (ANOMALIES & BACKUPS) --- */}
-            <div className="bottom-dashboards">
+            {/* --- BOTTOM DASHBOARDS (BACKUPS ONLY) --- */}
+            <div className="bottom-dashboards single-column">
                 
-                {/* Anomalies Table */}
-                <div className="bottom-card anomalies-card">
-                    <div className="bottom-card-header">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div className="icon-badge danger"><AlertTriangle size={20} /></div>
-                            <h3 style={{ margin: 0, color: 'var(--text-main)', fontSize: '18px' }}>QC Anomalies detected</h3>
-                        </div>
-                        <span className="anomaly-count">{anomalies.length} Records Downgraded</span>
-                    </div>
-                    <p className="bottom-card-desc">Records below were previously marked as <b>PASSED</b> by Lightwheel, but were retroactively downgraded to FAILED or PENDING during a subsequent sync. Your original durations are locked here.</p>
-                    
-                    <div className="table-wrapper">
-                        <table className="sync-table">
-                            <thead>
-                                <tr>
-                                    <th>Video ID</th>
-                                    <th>Producer</th>
-                                    <th>Locked Hours</th>
-                                    <th>Current Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {anomalies.length > 0 ? (
-                                    anomalies.map((anom) => (
-                                        <tr key={anom._id}>
-                                            <td className="data-name-cell">{anom.data_name}</td>
-                                            <td>{anom.producer}</td>
-                                            <td style={{ fontWeight: 'bold', color: '#10b981' }}>{anom.locked_duration ? (anom.locked_duration / 3600).toFixed(2) + ' hr' : 'N/A'}</td>
-                                            <td><span className="status-badge failed">{anom.inspect_result.replace('INSPECT_', '')}</span></td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan="4" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>No downgrades detected. Your data is secure.</td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
                 {/* Backups List */}
                 <div className="bottom-card backups-card">
                     <div className="bottom-card-header">

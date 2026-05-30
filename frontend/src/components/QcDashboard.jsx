@@ -11,6 +11,7 @@ import './QcDashboard.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
+// --- CUSTOM DROPDOWN COMPONENT ---
 const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder }) => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
@@ -26,21 +27,21 @@ const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder }) => 
     const selectedLabel = options.find(o => o.value === value)?.label || placeholder;
 
     return (
-        <div className="searchable-dropdown-container" style={{ width: 'auto', minWidth: '160px' }} ref={dropdownRef}>
-            <div className="searchable-dropdown-header" onClick={() => setIsOpen(!isOpen)}>
+        <div className="custom-dropdown-container" style={{ width: 'auto', minWidth: '160px' }} ref={dropdownRef}>
+            <div className="custom-dropdown-header" onClick={() => setIsOpen(!isOpen)}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     {Icon && <Icon size={16} color="var(--text-muted)" />}
                     <span>{selectedLabel}</span>
                 </div>
-                <ChevronDown size={16} color="var(--text-muted)" />
+                <ChevronDown size={16} color="var(--text-muted)" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }} />
             </div>
             {isOpen && (
-                <div className="searchable-dropdown-menu">
-                    <ul className="searchable-dropdown-list">
+                <div className="custom-dropdown-menu">
+                    <ul className="custom-dropdown-list">
                         {options.map(opt => (
                             <li 
                                 key={opt.value} 
-                                className={`searchable-dropdown-item ${value === opt.value ? 'active' : ''}`}
+                                className={`custom-dropdown-item ${value === opt.value ? 'active' : ''}`}
                                 onClick={() => { onChange(opt.value); setIsOpen(false); }}
                             >
                                 {opt.label}
@@ -94,32 +95,24 @@ export default function QcDashboard() {
         };
 
         if (type === 'today') {
-            setStartDate(formatDate(today));
-            setEndDate(formatDate(today));
+            setStartDate(formatDate(today)); setEndDate(formatDate(today));
         } else if (type === 'yesterday') {
-            const yesterday = new Date(today);
-            yesterday.setDate(yesterday.getDate() - 1);
-            setStartDate(formatDate(yesterday));
-            setEndDate(formatDate(yesterday));
+            const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+            setStartDate(formatDate(yesterday)); setEndDate(formatDate(yesterday));
         } else if (type === 'thisWeek') {
-            const monday = new Date(today);
-            const day = monday.getDay() || 7; 
+            const monday = new Date(today); const day = monday.getDay() || 7; 
             monday.setDate(monday.getDate() - (day - 1));
-            setStartDate(formatDate(monday));
-            setEndDate(formatDate(today));
+            setStartDate(formatDate(monday)); setEndDate(formatDate(today));
         } else if (type === 'thisMonth') {
             const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-            setStartDate(formatDate(firstDay));
-            setEndDate(formatDate(today));
+            setStartDate(formatDate(firstDay)); setEndDate(formatDate(today));
         } else if (type === 'allTime') {
-            setStartDate('');
-            setEndDate('');
+            setStartDate(''); setEndDate('');
         }
     };
 
     const handleDateChange = (setter, value) => {
-        setActiveFilter('');
-        setter(value);
+        setActiveFilter(''); setter(value);
     };
 
     useEffect(() => {
@@ -192,7 +185,7 @@ export default function QcDashboard() {
     const rejectionTree = qcData?.rejectionTree || [];
 
     return (
-        <div className="dashboard-card">
+        <div className="dashboard-card" style={{ maxWidth: '1400px', margin: '0 auto' }}>
             
             {/* TOP BAR & FILTERS */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
@@ -211,7 +204,7 @@ export default function QcDashboard() {
                 </div>
 
                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                    <div className="searchable-dropdown-header" style={{ cursor: 'default', height: '40px' }}>
+                    <div className="qc-filter-wrapper">
                         <Calendar size={16} color="var(--text-muted)" />
                         <input type="date" value={startDate} onChange={(e) => handleDateChange(setStartDate, e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none', paddingLeft: '8px' }} />
                         <span style={{ color: 'var(--text-muted)', margin: '0 8px' }}>to</span>
@@ -227,7 +220,7 @@ export default function QcDashboard() {
                 </div>
             </div>
 
-            {/* VIEW MODE TOGGLE & DYNAMIC DROPDOWN */}
+            {/* VIEW MODE TOGGLE & DYNAMIC SEARCH DROPDOWNS */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-secondary)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
                 
                 <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-main)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
@@ -246,27 +239,27 @@ export default function QcDashboard() {
                 </div>
 
                 {viewMode === 'BY_PRODUCER' ? (
-                    <div className="searchable-dropdown-container" ref={producerRef}>
-                        <div className="searchable-dropdown-header" onClick={() => setIsProducerOpen(!isProducerOpen)} style={{ background: 'var(--bg-main)' }}>
+                    <div className="custom-dropdown-container" ref={producerRef}>
+                        <div className="custom-dropdown-header" onClick={() => setIsProducerOpen(!isProducerOpen)} style={{ background: 'var(--bg-main)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <User size={16} color="var(--text-muted)" />
                                 <span>{selectedProducer ? selectedProducer.username : '-- Global Producers --'}</span>
                             </div>
-                            <ChevronDown size={16} color="var(--text-muted)" />
+                            <ChevronDown size={16} color="var(--text-muted)" style={{ transform: isProducerOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }} />
                         </div>
                         {isProducerOpen && (
-                            <div className="searchable-dropdown-menu">
-                                <div className="searchable-dropdown-search">
-                                    <Search size={14} className="searchable-dropdown-search-icon" />
+                            <div className="custom-dropdown-menu">
+                                <div className="custom-dropdown-search">
+                                    <Search size={14} className="custom-dropdown-search-icon" />
                                     <input type="text" placeholder="Search producers..." value={producerSearch} onChange={(e) => setProducerSearch(e.target.value)} autoFocus />
                                 </div>
-                                <ul className="searchable-dropdown-list">
-                                    <li className={`searchable-dropdown-item ${!selectedProducer ? 'active' : ''}`} onClick={() => { setSelectedProducer(null); setIsProducerOpen(false); setProducerSearch(''); }}>
+                                <ul className="custom-dropdown-list">
+                                    <li className={`custom-dropdown-item ${!selectedProducer ? 'active' : ''}`} onClick={() => { setSelectedProducer(null); setIsProducerOpen(false); setProducerSearch(''); }}>
                                         -- Global Producers --
                                     </li>
                                     {filteredProducers.map(p => (
-                                        <li key={p.username} className={`searchable-dropdown-item ${selectedProducer?.username === p.username ? 'active' : ''}`} onClick={() => { setSelectedProducer(p); setIsProducerOpen(false); setProducerSearch(''); }}>
-                                            {p.username} <span className="searchable-dropdown-item-team">{p.teamName}</span>
+                                        <li key={p.username} className={`custom-dropdown-item ${selectedProducer?.username === p.username ? 'active' : ''}`} onClick={() => { setSelectedProducer(p); setIsProducerOpen(false); setProducerSearch(''); }}>
+                                            {p.username} <span className="custom-dropdown-item-team">{p.teamName}</span>
                                         </li>
                                     ))}
                                 </ul>
@@ -274,26 +267,26 @@ export default function QcDashboard() {
                         )}
                     </div>
                 ) : (
-                    <div className="searchable-dropdown-container" ref={reasonRef}>
-                        <div className="searchable-dropdown-header" onClick={() => setIsReasonOpen(!isReasonOpen)} style={{ background: 'var(--bg-main)' }}>
+                    <div className="custom-dropdown-container" ref={reasonRef}>
+                        <div className="custom-dropdown-header" onClick={() => setIsReasonOpen(!isReasonOpen)} style={{ background: 'var(--bg-main)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <FileWarning size={16} color="var(--text-muted)" />
                                 <span>{selectedReason ? selectedReason : '-- Global Rejection Reasons --'}</span>
                             </div>
-                            <ChevronDown size={16} color="var(--text-muted)" />
+                            <ChevronDown size={16} color="var(--text-muted)" style={{ transform: isReasonOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }} />
                         </div>
                         {isReasonOpen && (
-                            <div className="searchable-dropdown-menu">
-                                <div className="searchable-dropdown-search">
-                                    <Search size={14} className="searchable-dropdown-search-icon" />
+                            <div className="custom-dropdown-menu">
+                                <div className="custom-dropdown-search">
+                                    <Search size={14} className="custom-dropdown-search-icon" />
                                     <input type="text" placeholder="Search reasons..." value={reasonSearch} onChange={(e) => setReasonSearch(e.target.value)} autoFocus />
                                 </div>
-                                <ul className="searchable-dropdown-list">
-                                    <li className={`searchable-dropdown-item ${!selectedReason ? 'active' : ''}`} onClick={() => { setSelectedReason(null); setIsReasonOpen(false); setReasonSearch(''); }}>
+                                <ul className="custom-dropdown-list">
+                                    <li className={`custom-dropdown-item ${!selectedReason ? 'active' : ''}`} onClick={() => { setSelectedReason(null); setIsReasonOpen(false); setReasonSearch(''); }}>
                                         -- Global Rejection Reasons --
                                     </li>
                                     {filteredReasons.map(r => (
-                                        <li key={r} className={`searchable-dropdown-item ${selectedReason === r ? 'active' : ''}`} onClick={() => { setSelectedReason(r); setIsReasonOpen(false); setReasonSearch(''); }}>
+                                        <li key={r} className={`custom-dropdown-item ${selectedReason === r ? 'active' : ''}`} onClick={() => { setSelectedReason(r); setIsReasonOpen(false); setReasonSearch(''); }}>
                                             {r}
                                         </li>
                                     ))}
@@ -329,7 +322,7 @@ export default function QcDashboard() {
                 </div>
             </div>
 
-            {/* --- NEW TREE DATA GRID --- */}
+            {/* --- TREE DATA GRID --- */}
             <h3 style={{ margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)' }}>
                 <ListFilter size={20} color="var(--primary)" />
                 {viewMode === 'BY_PRODUCER' ? 'Failure Analysis by Reason' : 'Failure Analysis by Producer'}
@@ -360,7 +353,7 @@ export default function QcDashboard() {
                                     style={{ borderBottom: isExpanded ? '1px solid var(--border-color)' : '1px solid var(--border-color)' }}
                                 >
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                        <button className="expand-btn" style={{ background: 'transparent' }}>
+                                        <button className="expand-btn" style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)' }}>
                                             {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                                         </button>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600', color: 'var(--text-main)', fontSize: '14px' }}>
@@ -388,7 +381,7 @@ export default function QcDashboard() {
                                                         onClick={() => toggleTask(taskKey)}
                                                     >
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                            <button className="expand-btn" style={{ background: 'transparent' }}>
+                                                            <button className="expand-btn" style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)' }}>
                                                                 {isTaskExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                                                             </button>
                                                             <div style={{ color: 'var(--text-main)', fontSize: '13px', fontWeight: '500' }}>

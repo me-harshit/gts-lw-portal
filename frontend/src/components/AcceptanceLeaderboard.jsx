@@ -1,12 +1,55 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useQuery } from '@tanstack/react-query';
-import { Filter, Calendar, Loader2, Trophy } from 'lucide-react';
+import { Filter, Calendar, Loader2, Trophy, ChevronDown } from 'lucide-react';
 import { formatDuration } from '../utils/timeFormat';
 import './TaskDashboard.css'; 
 import './AcceptanceLeaderboard.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+// --- CUSTOM DROPDOWN COMPONENT ---
+const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const dropdownRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) setIsOpen(false);
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const selectedLabel = options.find(o => o.value === value)?.label || placeholder;
+
+    return (
+        <div className="custom-dropdown-container" style={{ width: 'auto', minWidth: '200px' }} ref={dropdownRef}>
+            <div className="custom-dropdown-header" onClick={() => setIsOpen(!isOpen)}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {Icon && <Icon size={16} color="var(--text-muted)" />}
+                    <span>{selectedLabel}</span>
+                </div>
+                <ChevronDown size={16} color="var(--text-muted)" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }} />
+            </div>
+            {isOpen && (
+                <div className="custom-dropdown-menu">
+                    <ul className="custom-dropdown-list">
+                        {options.map(opt => (
+                            <li
+                                key={opt.value}
+                                className={`custom-dropdown-item ${value === opt.value ? 'active' : ''}`}
+                                onClick={() => { onChange(opt.value); setIsOpen(false); }}
+                            >
+                                {opt.label}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+        </div>
+    );
+};
 
 export default function AcceptanceLeaderboard() {
     const [teamCategory, setTeamCategory] = useState('ALL');
@@ -51,7 +94,7 @@ export default function AcceptanceLeaderboard() {
             setEndDate(formatDate(yesterday));
         } else if (type === 'thisWeek') {
             const monday = new Date(today);
-            const day = monday.getDay() || 7; // Convert Sunday (0) to 7
+            const day = monday.getDay() || 7; 
             monday.setDate(monday.getDate() - (day - 1));
             setStartDate(formatDate(monday));
             setEndDate(formatDate(today));
@@ -65,7 +108,6 @@ export default function AcceptanceLeaderboard() {
         }
     };
 
-    // Auto-clear active button if manual date is typed
     const handleManualDateChange = (setter, value) => {
         setActiveFilterBtn('');
         setter(value);
@@ -85,10 +127,8 @@ export default function AcceptanceLeaderboard() {
         refetchOnWindowFocus: false
     });
 
-    // Extract variables from the backend response format
     const leaderboard = queryResult?.data || [];
 
-    // --- CALCULATE GRAND TOTALS ---
     const totals = leaderboard.reduce((acc, curr) => ({
         accepted: acc.accepted + (curr.acceptedSec || 0),
         rejected: acc.rejected + (curr.rejectedSec || 0),
@@ -96,7 +136,7 @@ export default function AcceptanceLeaderboard() {
     }), { accepted: 0, rejected: 0, waiting: 0 });
 
     return (
-        <div className="dashboard-card">
+        <div className="dashboard-card" style={{ maxWidth: '1400px', margin: '0 auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <h2 className="dashboard-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
@@ -104,7 +144,6 @@ export default function AcceptanceLeaderboard() {
                         Acceptance Leaderboard
                     </h2>
                     
-                    {/* QUICK FILTER PILLS */}
                     <div className="quick-filters-container">
                         <button className={`quick-filter-btn ${activeFilterBtn === 'allTime' ? 'active' : ''}`} onClick={() => applyQuickFilter('allTime')}>All Time</button>
                         <button className={`quick-filter-btn ${activeFilterBtn === 'today' ? 'active' : ''}`} onClick={() => applyQuickFilter('today')}>Today</button>
@@ -132,19 +171,16 @@ export default function AcceptanceLeaderboard() {
                         />
                     </div>
 
-                    <div className="qc-filter-wrapper">
-                        <Filter size={16} color="var(--text-muted)" />
-                        <select
-                            value={teamCategory}
-                            onChange={(e) => setTeamCategory(e.target.value)}
-                            className="qc-filter-select"
-                        >
-                            <option value="ALL">All Teams (Global)</option>
-                            {teams.map(team => (
-                                <option key={team} value={team}>{team}</option>
-                            ))}
-                        </select>
-                    </div>
+                    {/* NEW CUSTOM SELECT DROPDOWN */}
+                    <CustomSelect
+                        icon={Filter}
+                        value={teamCategory}
+                        onChange={setTeamCategory}
+                        options={[
+                            { value: 'ALL', label: 'All Teams (Global)' },
+                            ...teams.map(team => ({ value: team, label: team }))
+                        ]}
+                    />
                 </div>
             </div>
 
@@ -190,7 +226,6 @@ export default function AcceptanceLeaderboard() {
                     <tbody>
                         {leaderboard.length > 0 ? (
                             leaderboard.map((row, index) => {
-                                // Apply special badge classes for the top 3
                                 let badgeClass = "rank-other";
                                 if (index === 0) badgeClass = "rank-1";
                                 else if (index === 1) badgeClass = "rank-2";

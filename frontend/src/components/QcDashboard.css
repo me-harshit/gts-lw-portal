@@ -32,49 +32,32 @@
 }
 
 .qc-tree-row:hover {
-    background: rgba(59, 130, 246, 0.04); /* Subtle primary tint on hover */
+    background: rgba(59, 130, 246, 0.04);
 }
 
-/* Level 1 (Top Level: Producer or Reason) */
 .qc-tree-row.level-1 {
     background: var(--bg-main);
 }
 
-/* Level 2 (Middle Level: Task) */
 .qc-tree-row.level-2 {
     background: var(--bg-secondary);
-    padding-left: 48px; /* Indent */
+    padding-left: 48px; 
     position: relative;
 }
 
-/* Level 3 (Deepest Level: Video Table Container) */
 .qc-tree-details {
     background: var(--bg-main);
-    padding: 16px 24px 16px 72px; /* Deep Indent */
+    padding: 16px 24px 16px 72px; 
     border-bottom: 1px solid var(--border-color);
     position: relative;
 }
 
-/* --- THE MAGIC: Visual Tree Guidelines --- */
-/* Line connecting Level 1 to Level 2 */
+/* --- Visual Tree Guidelines --- */
 .qc-tree-row.level-2::before {
-    content: '';
-    position: absolute;
-    left: 28px;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    background: var(--border-color);
+    content: ''; position: absolute; left: 28px; top: 0; bottom: 0; width: 2px; background: var(--border-color);
 }
-/* Line connecting Level 2 to Level 3 */
 .qc-tree-details::before {
-    content: '';
-    position: absolute;
-    left: 56px;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    background: var(--border-color);
+    content: ''; position: absolute; left: 56px; top: 0; bottom: 0; width: 2px; background: var(--border-color);
 }
 
 /* Badges */
@@ -124,7 +107,173 @@
     font-size: 13px;
     border-bottom: 1px solid var(--border-color);
 }
+.qc-inner-table tr:last-child td { border-bottom: none; }
 
-.qc-inner-table tr:last-child td {
-    border-bottom: none;
+
+/* ========================================================= */
+/* --- CUSTOM DROPDOWN UI (Shared with other Dashboards) --- */
+/* ========================================================= */
+.custom-dropdown-container { 
+    position: relative; 
+}
+
+.custom-dropdown-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 14px; 
+    background: rgba(59, 130, 246, 0.08); 
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 8px;
+    cursor: pointer; 
+    color: var(--text-main); 
+    font-size: 14px;
+    font-weight: 600; 
+    transition: all 0.2s ease; 
+    height: 40px; 
+    box-sizing: border-box;
+}
+
+.custom-dropdown-header:hover { 
+    background: rgba(59, 130, 246, 0.12);
+    border-color: rgba(59, 130, 246, 0.5); 
+}
+
+.custom-dropdown-menu {
+    position: absolute; 
+    top: 100%; 
+    left: 0; 
+    right: 0; 
+    margin-top: 8px;
+    background-color: var(--bg-main, #ffffff) !important; 
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    border-radius: 8px; 
+    box-shadow: 0 12px 40px rgba(0,0,0,0.3), 0 0 0 1px rgba(59, 130, 246, 0.1); 
+    z-index: 1000; 
+    overflow: hidden;
+}
+
+body.dark-mode .custom-dropdown-menu {
+    background-color: var(--bg-main, #1e1e2d) !important;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.7);
+}
+
+/* Specific to QC Dashboard: Dropdowns with internal search */
+.custom-dropdown-search {
+    padding: 10px; 
+    background: rgba(59, 130, 246, 0.05); 
+    border-bottom: 1px solid rgba(59, 130, 246, 0.2); 
+    position: relative;
+}
+
+.custom-dropdown-search input {
+    width: 100%; 
+    padding: 10px 12px 10px 34px; 
+    background-color: var(--bg-main, #ffffff) !important; 
+    border: 1px solid var(--border-color); 
+    color: var(--text-main);
+    border-radius: 6px; 
+    outline: none; 
+    font-size: 13px; 
+    box-sizing: border-box;
+    transition: border-color 0.2s ease;
+}
+
+body.dark-mode .custom-dropdown-search input {
+    background-color: var(--bg-main, #1e1e2d) !important;
+}
+
+.custom-dropdown-search input:focus { 
+    border-color: var(--primary); 
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.custom-dropdown-search-icon { 
+    position: absolute; left: 20px; top: 50%; transform: translateY(-50%); color: var(--primary); 
+}
+
+.custom-dropdown-list { 
+    max-height: 250px; overflow-y: auto; margin: 0; padding: 0; list-style: none; 
+}
+
+.custom-dropdown-item { 
+    padding: 12px 16px; 
+    cursor: pointer; 
+    color: var(--text-main); 
+    font-size: 14px; 
+    font-weight: 500;
+    transition: background-color 0.1s ease; 
+}
+
+.custom-dropdown-item:hover { 
+    background-color: rgba(59, 130, 246, 0.15); 
+    color: var(--primary); 
+}
+
+.custom-dropdown-item.active { 
+    background-color: var(--primary); 
+    color: white; 
+}
+.custom-dropdown-item-team { 
+    font-size: 11px; color: var(--text-muted); display: block; margin-top: 4px; 
+}
+.custom-dropdown-item.active .custom-dropdown-item-team { color: rgba(255, 255, 255, 0.8); }
+
+/* --- GLOBAL DATE FILTER WRAPPER --- */
+.qc-filter-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(59, 130, 246, 0.08); 
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    padding: 8px 14px; 
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    height: 40px; 
+    box-sizing: border-box;
+}
+
+.qc-filter-wrapper:hover {
+    background: rgba(59, 130, 246, 0.12);
+    border-color: rgba(59, 130, 246, 0.5);
+}
+
+.qc-filter-wrapper:focus-within {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+/* --- QUICK DATE FILTER BUTTONS --- */
+.quick-filters-container {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+}
+
+.quick-filter-btn {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.quick-filter-btn:hover {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: rgba(59, 130, 246, 0.4);
+    color: var(--primary);
+}
+
+.quick-filter-btn.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }

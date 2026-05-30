@@ -11,6 +11,7 @@ import './ProjectDashboard.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
+// --- REUSABLE CUSTOM SELECT COMPONENT ---
 const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder }) => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
@@ -32,7 +33,7 @@ const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder }) => 
                     {Icon && <Icon size={16} color="var(--text-muted)" />}
                     <span>{selectedLabel}</span>
                 </div>
-                <ChevronDown size={16} color="var(--text-muted)" />
+                <ChevronDown size={16} color="var(--text-muted)" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }} />
             </div>
             {isOpen && (
                 <div className="searchable-dropdown-menu">
@@ -99,32 +100,23 @@ export default function ProjectDashboard() {
         };
 
         if (type === 'today') {
-            setStart(formatDate(today));
-            setEnd(formatDate(today));
+            setStart(formatDate(today)); setEnd(formatDate(today));
         } else if (type === 'yesterday') {
-            const yesterday = new Date(today);
-            yesterday.setDate(yesterday.getDate() - 1);
-            setStart(formatDate(yesterday));
-            setEnd(formatDate(yesterday));
+            const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+            setStart(formatDate(yesterday)); setEnd(formatDate(yesterday));
         } else if (type === 'thisWeek') {
-            const monday = new Date(today);
-            const day = monday.getDay() || 7;
-            monday.setDate(monday.getDate() - (day - 1));
-            setStart(formatDate(monday));
-            setEnd(formatDate(today));
+            const monday = new Date(today); const day = monday.getDay() || 7; monday.setDate(monday.getDate() - (day - 1));
+            setStart(formatDate(monday)); setEnd(formatDate(today));
         } else if (type === 'thisMonth') {
             const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-            setStart(formatDate(firstDay));
-            setEnd(formatDate(today));
+            setStart(formatDate(firstDay)); setEnd(formatDate(today));
         } else if (type === 'allTime') {
-            setStart('');
-            setEnd('');
+            setStart(''); setEnd('');
         }
     };
 
     const handleDateChange = (setter, value, setActiveBtn) => {
-        setActiveBtn('');
-        setter(value);
+        setActiveBtn(''); setter(value);
     };
 
     useEffect(() => {
@@ -135,9 +127,7 @@ export default function ProjectDashboard() {
                 const uniqueTeams = new Set(mappings.map(m => m.teamName));
                 setTeams(Array.from(uniqueTeams));
                 setProducers(mappings);
-            } catch (error) {
-                console.error("Failed to load meta data", error);
-            }
+            } catch (error) { console.error("Failed to load meta data", error); }
         };
         fetchMeta();
     }, []);
@@ -173,21 +163,16 @@ export default function ProjectDashboard() {
         return matchesTeam && matchesSearch;
     });
 
-    // --- PERCENTAGE CALCULATIONS ---
     const totalCount = summary?.total?.count || 0;
     const acceptedCount = summary?.accepted?.count || 0;
     const rejectedCount = summary?.rejected?.count || 0;
     const pendingCount = summary?.pending?.count || 0;
 
     const inspectedCount = acceptedCount + rejectedCount;
-    // Calculate total hours for QC Done by adding accepted + rejected hours
     const inspectedHours = (summary?.accepted?.hours || 0) + (summary?.rejected?.hours || 0);
 
-    // Calculate percentages (.toFixed(2) keeps exactly two decimal places)
     const acceptanceRate = inspectedCount > 0 ? ((acceptedCount / inspectedCount) * 100).toFixed(2) : '0.00';
     const rejectionRate = inspectedCount > 0 ? ((rejectedCount / inspectedCount) * 100).toFixed(2) : '0.00';
-
-    // Pending and QC Done rates are based on the Total Volume
     const pendingRate = totalCount > 0 ? ((pendingCount / totalCount) * 100).toFixed(2) : '0.00';
     const inspectedRate = totalCount > 0 ? ((inspectedCount / totalCount) * 100).toFixed(2) : '0.00';
 
@@ -201,7 +186,6 @@ export default function ProjectDashboard() {
                         <Activity color="var(--primary)" size={24} />
                         Project Overview
                     </h2>
-                    {/* GLOBAL QUICK FILTERS */}
                     <div className="quick-filters-container">
                         <button className={`quick-filter-btn ${activeGlobalFilter === 'allTime' ? 'active' : ''}`} onClick={() => applyQuickFilter('allTime', setStartDate, setEndDate, setActiveGlobalFilter)}>All Time</button>
                         <button className={`quick-filter-btn ${activeGlobalFilter === 'today' ? 'active' : ''}`} onClick={() => applyQuickFilter('today', setStartDate, setEndDate, setActiveGlobalFilter)}>Today</button>
@@ -245,66 +229,39 @@ export default function ProjectDashboard() {
                     <span className="card-title">Total Volume</span>
                     <div style={{ display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
                         <span className="card-value" style={{ color: 'var(--primary)', lineHeight: '1' }}>{formatDecimalHours(summary?.total?.hours)}</span>
-                        <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>
-                            {totalCount.toLocaleString()} videos
-                        </span>
+                        <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>{totalCount.toLocaleString()} videos</span>
                     </div>
                 </div>
                 <div className="summary-card">
                     <span className="card-title">Total Accepted</span>
                     <div style={{ display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
                         <span className="card-value" style={{ color: '#10b981', lineHeight: '1' }}>{formatDecimalHours(summary?.accepted?.hours)}</span>
-                        <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>
-                            {acceptedCount.toLocaleString()} videos
-                        </span>
-                        {inspectedCount > 0 && (
-                            <span style={{ fontSize: '13px', color: 'var(--text-main)', marginTop: '2px', fontWeight: '600' }}>
-                                Acceptance Rate - {acceptanceRate}%
-                            </span>
-                        )}
+                        <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>{acceptedCount.toLocaleString()} videos</span>
+                        {inspectedCount > 0 && <span style={{ fontSize: '13px', color: 'var(--text-main)', marginTop: '2px', fontWeight: '600' }}>Acceptance Rate - {acceptanceRate}%</span>}
                     </div>
                 </div>
                 <div className="summary-card">
                     <span className="card-title">Total Rejected</span>
                     <div style={{ display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
                         <span className="card-value" style={{ color: '#ef4444', lineHeight: '1' }}>{formatDecimalHours(summary?.rejected?.hours)}</span>
-                        <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>
-                            {rejectedCount.toLocaleString()} videos
-                        </span>
-                        {inspectedCount > 0 && (
-                            <span style={{ fontSize: '13px', color: 'var(--text-main)', marginTop: '2px', fontWeight: '600' }}>
-                                Rejection Rate - {rejectionRate}%
-                            </span>
-                        )}
+                        <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>{rejectedCount.toLocaleString()} videos</span>
+                        {inspectedCount > 0 && <span style={{ fontSize: '13px', color: 'var(--text-main)', marginTop: '2px', fontWeight: '600' }}>Rejection Rate - {rejectionRate}%</span>}
                     </div>
                 </div>
-                {/* --- NEW QC DONE CARD --- */}
                 <div className="summary-card">
                     <span className="card-title">QC Done</span>
                     <div style={{ display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
                         <span className="card-value" style={{ color: '#3b82f6', lineHeight: '1' }}>{formatDecimalHours(inspectedHours)}</span>
-                        <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>
-                            {inspectedCount.toLocaleString()} videos
-                        </span>
-                        {totalCount > 0 && (
-                            <span style={{ fontSize: '13px', color: 'var(--text-main)', marginTop: '2px', fontWeight: '600' }}>
-                                QC Completed - {inspectedRate}%
-                            </span>
-                        )}
+                        <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>{inspectedCount.toLocaleString()} videos</span>
+                        {totalCount > 0 && <span style={{ fontSize: '13px', color: 'var(--text-main)', marginTop: '2px', fontWeight: '600' }}>QC Completed - {inspectedRate}%</span>}
                     </div>
                 </div>
                 <div className="summary-card">
                     <span className="card-title">Pending QC</span>
                     <div style={{ display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
                         <span className="card-value" style={{ color: '#f59e0b', lineHeight: '1' }}>{formatDecimalHours(summary?.pending?.hours)}</span>
-                        <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>
-                            {pendingCount.toLocaleString()} videos
-                        </span>
-                        {totalCount > 0 && (
-                            <span style={{ fontSize: '13px', color: 'var(--text-main)', marginTop: '2px', fontWeight: '600' }}>
-                                QC Pending - {pendingRate}%
-                            </span>
-                        )}
+                        <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>{pendingCount.toLocaleString()} videos</span>
+                        {totalCount > 0 && <span style={{ fontSize: '13px', color: 'var(--text-main)', marginTop: '2px', fontWeight: '600' }}>QC Pending - {pendingRate}%</span>}
                     </div>
                 </div>
             </div>
@@ -318,7 +275,6 @@ export default function ProjectDashboard() {
                         <ListChecks size={20} color="var(--primary)" />
                         Producer Analytics
                     </h3>
-                    {/* PRODUCER QUICK FILTERS */}
                     <div className="quick-filters-container">
                         <button className={`quick-filter-btn ${activeProdFilter === 'allTime' ? 'active' : ''}`} onClick={() => applyQuickFilter('allTime', setProdStartDate, setProdEndDate, setActiveProdFilter)}>All Time</button>
                         <button className={`quick-filter-btn ${activeProdFilter === 'today' ? 'active' : ''}`} onClick={() => applyQuickFilter('today', setProdStartDate, setProdEndDate, setActiveProdFilter)}>Today</button>
@@ -336,13 +292,13 @@ export default function ProjectDashboard() {
                         <input type="date" value={prodEndDate} onChange={(e) => handleDateChange(setProdEndDate, e.target.value, setActiveProdFilter)} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none' }} />
                     </div>
 
-                    <div className="searchable-dropdown-container" ref={dropdownRef}>
+                    <div className="searchable-dropdown-container" style={{ width: 'auto', minWidth: '240px' }} ref={dropdownRef}>
                         <div className="searchable-dropdown-header" onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <User size={16} color="var(--text-muted)" />
                                 <span>{selectedProducer ? selectedProducer.username : '-- Select Producer --'}</span>
                             </div>
-                            <ChevronDown size={16} color="var(--text-muted)" />
+                            <ChevronDown size={16} color="var(--text-muted)" style={{ transform: isDropdownOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }} />
                         </div>
 
                         {isDropdownOpen && (

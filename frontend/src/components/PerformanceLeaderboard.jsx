@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useQuery } from '@tanstack/react-query';
-import { Filter, Calendar, Loader2, Zap, Download } from 'lucide-react';
+import { Filter, Calendar, Loader2, Zap, Download, ChevronDown } from 'lucide-react';
 import { formatDuration } from '../utils/timeFormat';
-import { generateLeaderboardPDF } from '../utils/pdfExport'; // <-- IMPORT EXPORT UTILITY
+import { generateLeaderboardPDF } from '../utils/pdfExport'; 
 import './TaskDashboard.css'; 
 import './PerformanceLeaderboard.css'; 
 
@@ -16,6 +16,49 @@ const getTier = (avgSec) => {
     if (avgSec >= 7200) return { label: 'Mid-High', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' }; 
     if (avgSec >= 6300) return { label: 'Mid-Low', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' }; 
     return { label: 'Low', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' }; 
+};
+
+// --- CUSTOM DROPDOWN COMPONENT ---
+const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const dropdownRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) setIsOpen(false);
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const selectedLabel = options.find(o => o.value === value)?.label || placeholder;
+
+    return (
+        <div className="custom-dropdown-container" style={{ width: 'auto', minWidth: '180px' }} ref={dropdownRef}>
+            <div className="custom-dropdown-header" onClick={() => setIsOpen(!isOpen)}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {Icon && <Icon size={16} color="var(--text-muted)" />}
+                    <span>{selectedLabel}</span>
+                </div>
+                <ChevronDown size={16} color="var(--text-muted)" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }} />
+            </div>
+            {isOpen && (
+                <div className="custom-dropdown-menu">
+                    <ul className="custom-dropdown-list">
+                        {options.map(opt => (
+                            <li
+                                key={opt.value}
+                                className={`custom-dropdown-item ${value === opt.value ? 'active' : ''}`}
+                                onClick={() => { onChange(opt.value); setIsOpen(false); }}
+                            >
+                                {opt.label}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+        </div>
+    );
 };
 
 export default function PerformanceLeaderboard() {
@@ -51,32 +94,24 @@ export default function PerformanceLeaderboard() {
         };
 
         if (type === 'today') {
-            setStartDate(formatDate(today));
-            setEndDate(formatDate(today));
+            setStartDate(formatDate(today)); setEndDate(formatDate(today));
         } else if (type === 'yesterday') {
-            const yesterday = new Date(today);
-            yesterday.setDate(yesterday.getDate() - 1);
-            setStartDate(formatDate(yesterday));
-            setEndDate(formatDate(yesterday));
+            const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+            setStartDate(formatDate(yesterday)); setEndDate(formatDate(yesterday));
         } else if (type === 'thisWeek') {
-            const monday = new Date(today);
-            const day = monday.getDay() || 7; 
+            const monday = new Date(today); const day = monday.getDay() || 7; 
             monday.setDate(monday.getDate() - (day - 1));
-            setStartDate(formatDate(monday));
-            setEndDate(formatDate(today));
+            setStartDate(formatDate(monday)); setEndDate(formatDate(today));
         } else if (type === 'thisMonth') {
             const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-            setStartDate(formatDate(firstDay));
-            setEndDate(formatDate(today));
+            setStartDate(formatDate(firstDay)); setEndDate(formatDate(today));
         } else if (type === 'allTime') {
-            setStartDate('');
-            setEndDate('');
+            setStartDate(''); setEndDate('');
         }
     };
 
     const handleManualDateChange = (setter, value) => {
-        setActiveFilterBtn('');
-        setter(value);
+        setActiveFilterBtn(''); setter(value);
     };
 
     const { data: queryResult, isFetching } = useQuery({
@@ -105,7 +140,6 @@ export default function PerformanceLeaderboard() {
     const handleExportPDF = () => {
         if (leaderboard.length === 0) return;
         
-        // Map the data to ensure keys match exactly what pdfExport.js expects
         const mappedData = leaderboard.map(row => ({
             producer: row.producer,
             totalDuration: row.totalSec, 
@@ -117,7 +151,7 @@ export default function PerformanceLeaderboard() {
     };
 
     return (
-        <div className="dashboard-card">
+        <div className="dashboard-card" style={{ maxWidth: '1400px', margin: '0 auto' }}>
             
             {/* TOP HEADER & FILTERS */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
@@ -151,18 +185,18 @@ export default function PerformanceLeaderboard() {
                         />
                     </div>
 
-                    <div className="qc-filter-wrapper">
-                        <Filter size={16} color="var(--text-muted)" />
-                        <select
-                            value={teamCategory} onChange={(e) => setTeamCategory(e.target.value)}
-                            className="qc-filter-select"
-                        >
-                            <option value="ALL">All Teams</option>
-                            {teams.map(team => <option key={team} value={team}>{team}</option>)}
-                        </select>
-                    </div>
+                    {/* NEW CUSTOM SELECT DROPDOWN */}
+                    <CustomSelect
+                        icon={Filter}
+                        value={teamCategory}
+                        onChange={setTeamCategory}
+                        options={[
+                            { value: 'ALL', label: 'All Teams (Global)' },
+                            ...teams.map(team => ({ value: team, label: team }))
+                        ]}
+                    />
 
-                    {/* --- NEW PDF EXPORT BUTTON --- */}
+                    {/* PDF EXPORT BUTTON */}
                     <button 
                         onClick={handleExportPDF}
                         disabled={leaderboard.length === 0}

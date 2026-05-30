@@ -1,17 +1,38 @@
 /* --- SIDEBAR BASE --- */
 .sidebar {
   width: 260px;
-  background-color: var(--bg-sidebar);
+  background-color: var(--bg-main, #ffffff); 
   border-right: 1px solid var(--border-color);
   position: fixed;
-  top: 64px; /* Sits exactly below Topbar */
+  top: 64px; 
   bottom: 0;
   left: 0;
-  padding: 32px 16px;
   display: flex;
   flex-direction: column;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
   z-index: 90;
+}
+
+body.dark-mode .sidebar {
+  background-color: var(--bg-main, #111827);
+}
+
+/* --- THE SCROLLABLE AREA --- */
+.sidebar-scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px 16px;
+}
+
+/* Custom Scrollbar for Sidebar */
+.sidebar-scroll-area::-webkit-scrollbar {
+    width: 4px;
+}
+.sidebar-scroll-area::-webkit-scrollbar-track {
+    background: transparent;
+}
+.sidebar-scroll-area::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
 }
 
 .sidebar-section {
@@ -40,7 +61,7 @@
   color: var(--text-muted);
   font-size: 14px;
   font-weight: 500;
-  font-family: inherit; /* Inherits Poppins */
+  font-family: inherit; 
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -48,14 +69,12 @@
   transition: all 0.3s ease;
 }
 
-/* Smooth hover interaction */
 .nav-button:hover:not(.disabled) {
   background-color: var(--bg-page);
   color: var(--primary);
-  transform: translateX(4px); /* Slides slightly right on hover */
+  transform: translateX(4px); 
 }
 
-/* Active State */
 .nav-button.active {
   background-color: var(--primary);
   color: #ffffff;
@@ -65,23 +84,4 @@
 
 .nav-icon {
   transition: color 0.3s ease;
-}
-
-/* --- DISABLED / COMING SOON --- */
-.nav-button.disabled {
-  cursor: not-allowed;
-  opacity: 0.7;
-}
-
-.coming-soon-badge {
-  margin-left: auto; /* Pushes badge to the far right */
-  background-color: var(--bg-page);
-  border: 1px solid var(--border-color);
-  color: var(--text-muted);
-  font-size: 10px;
-  padding: 4px 8px;
-  border-radius: 20px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
 }

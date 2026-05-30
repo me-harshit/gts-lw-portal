@@ -1,4 +1,159 @@
-/* Leaderboard Table Styling */
+/* --- OVERALL LAYOUT --- */
+.dashboard-card {
+    background: var(--bg-main);
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--border-color);
+}
+
+.dashboard-header {
+    color: var(--text-main);
+    font-size: 20px;
+    font-weight: 600;
+}
+
+/* --- SUMMARY CARDS --- */
+.summary-cards {
+    display: flex;
+    flex-wrap: wrap; 
+    gap: 16px;
+    margin-bottom: 40px;
+}
+
+.summary-card {
+    flex: 1;
+    min-width: 180px; 
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.summary-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.card-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.card-value {
+    font-size: 28px;
+    font-weight: 700;
+    margin-top: 4px;
+}
+
+/* --- CUSTOM DROPDOWN UI --- */
+.custom-dropdown-container { 
+    position: relative; 
+}
+
+.custom-dropdown-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 14px; 
+    
+    /* GLASSMORPHISM TINT */
+    background: rgba(59, 130, 246, 0.08); 
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    
+    border-radius: 8px;
+    cursor: pointer; 
+    color: var(--text-main); 
+    font-size: 14px;
+    font-weight: 600; 
+    transition: all 0.2s ease; 
+    height: 40px; 
+    box-sizing: border-box;
+}
+
+.custom-dropdown-header:hover { 
+    background: rgba(59, 130, 246, 0.12);
+    border-color: rgba(59, 130, 246, 0.5); 
+}
+
+.custom-dropdown-menu {
+    position: absolute; 
+    top: 100%; 
+    left: 0; 
+    right: 0; 
+    margin-top: 8px;
+    
+    /* SOLID BACKGROUND (Fixes text bleed-through) */
+    background-color: var(--bg-main, #ffffff) !important; 
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    border-radius: 8px; 
+    box-shadow: 0 12px 40px rgba(0,0,0,0.3), 0 0 0 1px rgba(59, 130, 246, 0.1); 
+    z-index: 1000; 
+    overflow: hidden;
+}
+
+body.dark-mode .custom-dropdown-menu {
+    background-color: var(--bg-main, #1e1e2d) !important;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.7);
+}
+
+.custom-dropdown-list { 
+    max-height: 250px; overflow-y: auto; margin: 0; padding: 0; list-style: none; 
+}
+
+.custom-dropdown-item { 
+    padding: 12px 16px; 
+    cursor: pointer; 
+    color: var(--text-main); 
+    font-size: 14px; 
+    font-weight: 500;
+    transition: background-color 0.1s ease; 
+}
+
+.custom-dropdown-item:hover { 
+    background-color: rgba(59, 130, 246, 0.15); 
+    color: var(--primary); 
+}
+
+.custom-dropdown-item.active { 
+    background-color: var(--primary); 
+    color: white; 
+}
+
+/* Global Calendar Filter Wrapper */
+.qc-filter-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(59, 130, 246, 0.08); 
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    padding: 8px 14px; 
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    height: 40px; 
+    box-sizing: border-box;
+}
+
+.qc-filter-wrapper:hover {
+    background: rgba(59, 130, 246, 0.12);
+    border-color: rgba(59, 130, 246, 0.5);
+}
+
+.qc-filter-wrapper:focus-within {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+/* --- LEADERBOARD TABLE --- */
 .leaderboard-container {
     overflow-x: auto;
     border-radius: 8px;
@@ -91,7 +246,6 @@
     box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
 
-/* Last Updated Text */
 .last-updated-bar {
     display: flex;
     align-items: center;

@@ -14,6 +14,7 @@ import teamRoutes from './routes/teamRoutes.js';
 import leaderboardRoutes from './routes/leaderboardRoutes.js';
 import configRoutes from './routes/configRoutes.js';
 import backupRoutes from './routes/backupRoutes.js';
+import attendanceRoutes from './routes/attendanceRoutes.js';
 
 dotenv.config();
 connectDB();
@@ -57,6 +58,7 @@ app.use('/api/teams', teamRoutes);
 app.use('/api/leaderboards', leaderboardRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/backups', backupRoutes);
+app.use('/api/attendance', attendanceRoutes);
 
 initCronJobs();
 

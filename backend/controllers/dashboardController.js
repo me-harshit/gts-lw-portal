@@ -436,13 +436,44 @@ export const stopTranslation = (req, res) => {
     res.json({ message: "Stop command sent. Engine will halt after the current chunk." });
 };
 
-// --- ANOMALY TRACKER FETCH ---
+// --- ANOMALY TRACKER FETCH (WITH DATES, PAGINATION & GRAND TOTAL) ---
 export const getAnomalies = async (req, res) => {
     try {
-        const anomalies = await AllRecord.find({ is_downgraded: true })
+        const { startDate, endDate, page = 1, limit = 50 } = req.query;
+        let query = { is_downgraded: true };
+
+        if (startDate && endDate) {
+            const start = new Date(`${startDate}T00:00:00.000Z`);
+            const end = new Date(`${endDate}T23:59:59.999Z`);
+            query.updatedAt = { $gte: start, $lte: end };
+        }
+
+        // Pagination Math
+        const skip = (Number(page) - 1) * Number(limit);
+        const totalRecords = await AllRecord.countDocuments(query);
+        const totalPages = Math.ceil(totalRecords / Number(limit));
+
+        // --- NEW: Calculate the Grand Total Hours across ALL filtered records ---
+        const aggregation = await AllRecord.aggregate([
+            { $match: query },
+            { $group: { _id: null, totalLostSeconds: { $sum: "$locked_duration" } } }
+        ]);
+        const totalLostSeconds = aggregation.length > 0 ? aggregation[0].totalLostSeconds : 0;
+
+        const anomalies = await AllRecord.find(query)
             .select('data_name producer project_category locked_duration inspect_result status_history updatedAt')
-            .sort({ updatedAt: -1 });
-        res.json(anomalies);
+            .sort({ updatedAt: -1 })
+            .skip(skip)
+            .limit(Number(limit));
+            
+        res.json({ 
+            anomalies, 
+            totalPages, 
+            currentPage: Number(page), 
+            totalRecords,
+            totalLostSeconds // <-- Pass the true grand total to the frontend
+        });
+
     } catch (error) {
         console.error("Failed to fetch anomalies:", error);
         res.status(500).json({ error: 'Failed to fetch QC anomalies.' });
