@@ -3,19 +3,19 @@ import axios from 'axios';
 import { useQuery } from '@tanstack/react-query';
 import { Filter, Calendar, Loader2, Zap, Download, ChevronDown } from 'lucide-react';
 import { formatDuration } from '../utils/timeFormat';
-import { generateLeaderboardPDF } from '../utils/pdfExport'; 
-import './TaskDashboard.css'; 
-import './PerformanceLeaderboard.css'; 
+import { generateLeaderboardPDF } from '../utils/pdfExport';
+import './TaskDashboard.css';
+import './PerformanceLeaderboard.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 // Tier Logic Helper
 const getTier = (avgSec) => {
     if (!avgSec) return { label: 'No Data', color: 'var(--text-muted)', bg: 'var(--bg-secondary)' };
-    if (avgSec >= 9000) return { label: 'Top Tier', color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' }; 
-    if (avgSec >= 7200) return { label: 'Mid-High', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' }; 
-    if (avgSec >= 6300) return { label: 'Mid-Low', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' }; 
-    return { label: 'Low', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' }; 
+    if (avgSec >= 9000) return { label: 'Top Tier', color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' };
+    if (avgSec >= 7200) return { label: 'Mid-High', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' };
+    if (avgSec >= 6300) return { label: 'Mid-Low', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' };
+    return { label: 'Low', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' };
 };
 
 // --- CUSTOM DROPDOWN COMPONENT ---
@@ -67,6 +67,7 @@ export default function PerformanceLeaderboard() {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [activeFilterBtn, setActiveFilterBtn] = useState('');
+    const [isExporting, setIsExporting] = useState(false); // Export loading state
 
     useEffect(() => {
         const fetchTeams = async () => {
@@ -85,7 +86,7 @@ export default function PerformanceLeaderboard() {
     const applyQuickFilter = (type) => {
         setActiveFilterBtn(type);
         const today = new Date();
-        
+
         const formatDate = (date) => {
             const yyyy = date.getFullYear();
             const mm = String(date.getMonth() + 1).padStart(2, '0');
@@ -99,7 +100,7 @@ export default function PerformanceLeaderboard() {
             const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
             setStartDate(formatDate(yesterday)); setEndDate(formatDate(yesterday));
         } else if (type === 'thisWeek') {
-            const monday = new Date(today); const day = monday.getDay() || 7; 
+            const monday = new Date(today); const day = monday.getDay() || 7;
             monday.setDate(monday.getDate() - (day - 1));
             setStartDate(formatDate(monday)); setEndDate(formatDate(today));
         } else if (type === 'thisMonth') {
@@ -114,8 +115,9 @@ export default function PerformanceLeaderboard() {
         setActiveFilterBtn(''); setter(value);
     };
 
-    const { data: queryResult, isFetching } = useQuery({
-        queryKey: ['performanceLeaderboard', teamCategory, startDate, endDate],
+    // 1. FETCH FILTERED DATA (Total Volume based on dates)
+    const { data: filteredResult, isFetching: isFetchingFiltered } = useQuery({
+        queryKey: ['perfFiltered', teamCategory, startDate, endDate],
         queryFn: async () => {
             let url = `${API_URL}/api/leaderboards/performance?teamName=${teamCategory}`;
             if (startDate && endDate) {
@@ -128,40 +130,76 @@ export default function PerformanceLeaderboard() {
         refetchOnWindowFocus: false
     });
 
-    const leaderboardRaw = queryResult?.data || [];
-    const leaderboard = [...leaderboardRaw].sort((a, b) => b.dailyAverageSec - a.dailyAverageSec);
+    // 2. FETCH ALL-TIME DATA (Strictly for Daily Averages)
+    const { data: allTimeResult, isFetching: isFetchingAllTime } = useQuery({
+        queryKey: ['perfAllTime', teamCategory],
+        queryFn: async () => {
+            const url = `${API_URL}/api/leaderboards/performance?teamName=${teamCategory}`;
+            const res = await axios.get(url);
+            return res.data;
+        },
+        placeholderData: (previousData) => previousData,
+        refetchOnWindowFocus: false
+    });
 
-    const totalHoursSec = leaderboard.reduce((acc, curr) => acc + (curr.totalSec || 0), 0) || 0;
-    const teamAvgSec = leaderboard.length ? (totalHoursSec / leaderboard.length) : 0;
-    const topPerformers = leaderboard.filter(p => p.dailyAverageSec >= 9000).length || 0;
-    const lowPerformers = leaderboard.filter(p => p.dailyAverageSec < 6300).length || 0;
+    const isFetching = isFetchingFiltered || isFetchingAllTime;
+    const filteredRaw = filteredResult?.data || [];
+    const allTimeRaw = allTimeResult?.data || [];
 
-    // --- EXPORT HANDLER ---
-    const handleExportPDF = () => {
+    // 3. MERGE DATA 
+    // Uses the filtered results for the list, but injects the All-Time average for the tier grading.
+    const leaderboard = filteredRaw.map(row => {
+        const allTimeMatch = allTimeRaw.find(a => a.producer === row.producer);
+        return {
+            ...row,
+            // Override the filtered daily average with their absolute historical average
+            dailyAverageSec: allTimeMatch ? allTimeMatch.dailyAverageSec : row.dailyAverageSec
+        };
+    }).sort((a, b) => b.dailyAverageSec - a.dailyAverageSec);
+
+    // --- SUMMARY MATH ---
+    const totalHoursSec = leaderboard.reduce((acc, curr) => acc + (curr.totalSec || 0), 0);
+
+    // FIX: Averages the actual daily averages, not the total hours!
+    const teamAvgSec = leaderboard.length
+        ? leaderboard.reduce((acc, curr) => acc + (curr.dailyAverageSec || 0), 0) / leaderboard.length
+        : 0;
+
+    const topPerformers = leaderboard.filter(p => p.dailyAverageSec >= 9000).length;
+    const lowPerformers = leaderboard.filter(p => p.dailyAverageSec < 6300).length;
+
+    // --- SMART EXPORT HANDLER ---
+    const handleExportPDF = async () => {
         if (leaderboard.length === 0) return;
-        
-        const mappedData = leaderboard.map(row => ({
-            producer: row.producer,
-            totalDuration: row.totalSec, 
-            dailyAverage: row.dailyAverageSec
-        }));
+        setIsExporting(true);
+        try {
+            // Note how this maps over "leaderboard" (which we just fixed to use All-Time averages)
+            const mappedData = leaderboard.map(row => ({
+                producer: row.producer,
+                totalDuration: row.totalSec,
+                dailyAverage: row.dailyAverageSec // This is now safely locked to the All-Time average!
+            }));
 
-        const displayTeamName = teamCategory === 'ALL' ? 'GTS Inhouse (All Teams)' : teamCategory;
-        generateLeaderboardPDF(mappedData, startDate, endDate, displayTeamName);
+            const displayTeamName = teamCategory === 'ALL' ? 'GTS Inhouse (All Teams)' : teamCategory;
+            await generateLeaderboardPDF(mappedData, startDate, endDate, displayTeamName);
+        } catch (error) {
+            console.error("Export failed", error);
+        } finally {
+            setIsExporting(false);
+        }
     };
 
     return (
         <div className="dashboard-card" style={{ maxWidth: '1400px', margin: '0 auto' }}>
-            
+
             {/* TOP HEADER & FILTERS */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <h2 className="dashboard-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                         <Zap color="#3b82f6" size={24} />
-                        Performance Analytics
+                        Performance Board
                     </h2>
-                    
-                    {/* QUICK FILTER PILLS */}
+
                     <div className="quick-filters-container">
                         <button className={`quick-filter-btn ${activeFilterBtn === 'allTime' ? 'active' : ''}`} onClick={() => applyQuickFilter('allTime')}>All Time</button>
                         <button className={`quick-filter-btn ${activeFilterBtn === 'today' ? 'active' : ''}`} onClick={() => applyQuickFilter('today')}>Today</button>
@@ -174,18 +212,17 @@ export default function PerformanceLeaderboard() {
                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
                     <div className="qc-filter-wrapper">
                         <Calendar size={16} color="var(--text-muted)" />
-                        <input 
+                        <input
                             type="date" value={startDate} onChange={(e) => handleManualDateChange(setStartDate, e.target.value)}
                             style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none' }}
                         />
                         <span style={{ color: 'var(--text-muted)' }}>to</span>
-                        <input 
+                        <input
                             type="date" value={endDate} onChange={(e) => handleManualDateChange(setEndDate, e.target.value)}
                             style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none' }}
                         />
                     </div>
 
-                    {/* NEW CUSTOM SELECT DROPDOWN */}
                     <CustomSelect
                         icon={Filter}
                         value={teamCategory}
@@ -196,10 +233,9 @@ export default function PerformanceLeaderboard() {
                         ]}
                     />
 
-                    {/* PDF EXPORT BUTTON */}
-                    <button 
+                    <button
                         onClick={handleExportPDF}
-                        disabled={leaderboard.length === 0}
+                        disabled={leaderboard.length === 0 || isExporting}
                         style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -214,13 +250,13 @@ export default function PerformanceLeaderboard() {
                             cursor: leaderboard.length === 0 ? 'not-allowed' : 'pointer',
                             boxShadow: leaderboard.length === 0 ? 'none' : '0 2px 4px rgba(59, 130, 246, 0.3)',
                             transition: 'all 0.2s',
-                            height: '40px', 
+                            height: '40px',
                         }}
-                        onMouseEnter={(e) => { if(leaderboard.length > 0) e.currentTarget.style.backgroundColor = '#2563eb' }}
-                        onMouseLeave={(e) => { if(leaderboard.length > 0) e.currentTarget.style.backgroundColor = 'var(--primary)' }}
+                        onMouseEnter={(e) => { if (leaderboard.length > 0) e.currentTarget.style.backgroundColor = '#2563eb' }}
+                        onMouseLeave={(e) => { if (leaderboard.length > 0) e.currentTarget.style.backgroundColor = 'var(--primary)' }}
                     >
                         <Download size={16} />
-                        Export PDF
+                        {isExporting ? 'Generating...' : 'Export PDF'}
                     </button>
                 </div>
             </div>
@@ -278,13 +314,13 @@ export default function PerformanceLeaderboard() {
                                         <td style={{ fontWeight: '600' }}>{formatDuration(row.totalSec)}</td>
                                         <td style={{ fontWeight: '600', color: 'var(--text-muted)' }}>{formatDuration(row.dailyAverageSec)}</td>
                                         <td>
-                                            <span style={{ 
-                                                backgroundColor: tier.bg, 
-                                                color: tier.color, 
-                                                padding: '4px 10px', 
-                                                borderRadius: '12px', 
-                                                fontSize: '12px', 
-                                                fontWeight: '700' 
+                                            <span style={{
+                                                backgroundColor: tier.bg,
+                                                color: tier.color,
+                                                padding: '4px 10px',
+                                                borderRadius: '12px',
+                                                fontSize: '12px',
+                                                fontWeight: '700'
                                             }}>
                                                 {tier.label}
                                             </span>
