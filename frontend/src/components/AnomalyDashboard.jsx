@@ -88,7 +88,7 @@ export default function AnomalyDashboard() {
             }
             const res = await axios.get(url);
             if (res.data.anomalies.length > 0) {
-                generateAnomaliesPDF(res.data.anomalies, startDate, endDate);
+                await generateAnomaliesPDF(res.data.anomalies, startDate, endDate);
             }
         } catch (error) {
             console.error("Export failed:", error);

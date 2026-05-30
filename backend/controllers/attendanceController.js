@@ -3,7 +3,7 @@ import AllRecord from '../models/AllRecords.js';
 export const getAttendance = async (req, res) => {
     try {
         const { startDate, endDate, page = 1, limit = 50, team, producer } = req.query;
-        
+
         let initialMatch = {
             producer: { $exists: true, $ne: "" },
             start_produce_time: { $exists: true, $ne: null }
@@ -14,8 +14,8 @@ export const getAttendance = async (req, res) => {
 
         const pipeline = [
             { $match: initialMatch },
-            
-            // TIMEZONE MATH (-2.5h for IST, then -6h for logical day cutoff)
+
+            // TIMEZONE MATH
             {
                 $addFields: {
                     actual_ist_time: { $subtract: ["$start_produce_time", 2.5 * 60 * 60 * 1000] },
@@ -24,6 +24,10 @@ export const getAttendance = async (req, res) => {
                             { $subtract: ["$start_produce_time", 2.5 * 60 * 60 * 1000] },
                             6 * 60 * 60 * 1000
                         ]
+                    },
+                    // Safely parse video_duration to a double (handles strings, nulls, and missing fields securely)
+                    safe_video_duration: {
+                        $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 }
                     }
                 }
             },
@@ -36,7 +40,6 @@ export const getAttendance = async (req, res) => {
             }
         ];
 
-        // Apply Date Filters 
         if (startDate && endDate) {
             pipeline.push({
                 $match: {
@@ -45,44 +48,46 @@ export const getAttendance = async (req, res) => {
             });
         }
 
-        // --- GROUP 1: By Producer and Date (Gets Daily Check In/Out) ---
+        // --- GROUP 1: By Producer and Date ---
         pipeline.push({
             $group: {
                 _id: { producer: "$producer", date: "$working_date" },
                 checkIn: { $min: "$actual_ist_time" },
                 checkOut: { $max: "$actual_ist_time" },
-                totalVideos: { $sum: 1 }
+                totalVideos: { $sum: 1 },
+                dailyRecordedSec: { $sum: "$safe_video_duration" } // NEW: Total video time for the day
             }
         });
 
         pipeline.push({
             $addFields: {
-                officeDurationSec: { 
-                    $divide: [{ $subtract: ["$checkOut", "$checkIn"] }, 1000] 
+                officeDurationSec: {
+                    $divide: [{ $subtract: ["$checkOut", "$checkIn"] }, 1000]
                 }
             }
         });
 
-        // --- GROUP 2: By Producer (Rolls up to User Level & creates Daily Array) ---
+        // --- GROUP 2: Rollup by Producer ---
         pipeline.push({
             $group: {
                 _id: "$_id.producer",
                 presentDays: { $sum: 1 },
                 totalVideos: { $sum: "$totalVideos" },
                 totalOfficeDurationSec: { $sum: "$officeDurationSec" },
+                totalRecordedSec: { $sum: "$dailyRecordedSec" }, // NEW: Grand total recorded time
                 dailyRecords: {
                     $push: {
                         date: "$_id.date",
                         checkIn: "$checkIn",
                         checkOut: "$checkOut",
                         totalVideos: "$totalVideos",
-                        officeDurationSec: "$officeDurationSec"
+                        officeDurationSec: "$officeDurationSec",
+                        recordedSec: "$dailyRecordedSec" // NEW: Pass daily recorded time to overlay
                     }
                 }
             }
         });
 
-        // Format final output and sort daily arrays
         pipeline.push({
             $project: {
                 _id: 0,
@@ -90,16 +95,15 @@ export const getAttendance = async (req, res) => {
                 presentDays: 1,
                 totalVideos: 1,
                 totalOfficeDurationSec: 1,
+                totalRecordedSec: 1,
                 dailyRecords: {
                     $sortArray: { input: "$dailyRecords", sortBy: { date: -1 } }
                 }
             }
         });
 
-        // Sort overall list alphabetically
         pipeline.push({ $sort: { producer: 1 } });
 
-        // --- Execute Pagination ---
         const skip = (Number(page) - 1) * Number(limit);
         const facetPipeline = [
             ...pipeline,
@@ -112,7 +116,7 @@ export const getAttendance = async (req, res) => {
         ];
 
         const result = await AllRecord.aggregate(facetPipeline);
-        
+
         const records = result[0].data;
         const totalRecords = result[0].metadata[0] ? result[0].metadata[0].total : 0;
         const totalPages = Math.ceil(totalRecords / Number(limit));

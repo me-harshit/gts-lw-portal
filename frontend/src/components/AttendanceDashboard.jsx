@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Calendar, ChevronLeft, ChevronRight, Search, Filter, UserCheck, AlertCircle, X, Eye, ChevronDown, Users } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Search, Filter, UserCheck, AlertCircle, X, Eye, ChevronDown, Users, Download, Video } from 'lucide-react';
+import { generateAttendancePDF } from '../utils/pdfExport'; 
 import './ProjectDashboard.css'; 
 import './AttendanceDashboard.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-// --- CUSTOM DROPDOWN COMPONENT ---
 const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder }) => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
@@ -52,6 +52,7 @@ const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder }) => 
 export default function AttendanceDashboard() {
     const [attendance, setAttendance] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isExporting, setIsExporting] = useState(false);
     const [teams, setTeams] = useState([]);
 
     const [startDate, setStartDate] = useState('');
@@ -131,13 +132,31 @@ export default function AttendanceDashboard() {
         let count = 0;
         let current = new Date(start);
         while (current <= end) {
-            if (current.getDay() !== 0) count++; // 0 is Sunday
+            if (current.getDay() !== 0) count++; 
             current.setDate(current.getDate() + 1);
         }
         return count;
     };
 
     const expectedWorkingDays = getExpectedWorkingDays();
+
+    const handleExportPDF = async () => {
+        setIsExporting(true);
+        try {
+            let url = `${API_URL}/api/attendance?page=1&limit=50000&startDate=${startDate}&endDate=${endDate}`;
+            if (teamCategory !== 'ALL') url += `&team=${teamCategory}`;
+            if (searchQuery) url += `&producer=${searchQuery}`;
+
+            const res = await axios.get(url);
+            if (res.data.attendance.length > 0) {
+                await generateAttendancePDF(res.data.attendance, startDate, endDate, expectedWorkingDays, teamCategory);
+            }
+        } catch (error) {
+            console.error("Export failed:", error);
+        } finally {
+            setIsExporting(false);
+        }
+    };
 
     const formatTimeIST = (dateString) => {
         if (!dateString) return 'N/A';
@@ -174,7 +193,6 @@ export default function AttendanceDashboard() {
                         <input type="text" placeholder="Search Producer..." value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }} className="attendance-search" />
                     </div>
 
-                    {/* NEW CUSTOM SELECT DROPDOWN */}
                     <CustomSelect 
                         icon={Users}
                         value={teamCategory}
@@ -188,6 +206,26 @@ export default function AttendanceDashboard() {
                         <span style={{ color: 'var(--text-muted)' }}>to</span>
                         <input type="date" value={endDate} onChange={(e) => handleManualDateChange(setEndDate, e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none' }} />
                     </div>
+
+                    <button 
+                        onClick={handleExportPDF}
+                        disabled={totalRecords === 0 || isExporting}
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            backgroundColor: totalRecords === 0 ? 'var(--bg-secondary)' : 'var(--primary)',
+                            color: totalRecords === 0 ? 'var(--text-muted)' : 'white',
+                            border: totalRecords === 0 ? '1px solid var(--border-color)' : 'none',
+                            padding: '0 16px', borderRadius: '8px', fontSize: '14px', fontWeight: '600',
+                            cursor: totalRecords === 0 ? 'not-allowed' : 'pointer', height: '40px',
+                            boxShadow: totalRecords === 0 ? 'none' : '0 2px 4px rgba(59, 130, 246, 0.3)',
+                            transition: 'all 0.2s',
+                        }}
+                        onMouseEnter={(e) => { if(totalRecords > 0) e.currentTarget.style.backgroundColor = '#2563eb' }}
+                        onMouseLeave={(e) => { if(totalRecords > 0) e.currentTarget.style.backgroundColor = 'var(--primary)' }}
+                    >
+                        <Download size={16} />
+                        {isExporting ? 'Generating...' : 'Export PDF'}
+                    </button>
                 </div>
             </div>
 
@@ -199,13 +237,14 @@ export default function AttendanceDashboard() {
                             <th className="att-th" style={{ textAlign: 'center' }}>Present Days</th>
                             <th className="att-th" style={{ textAlign: 'center' }}>Leaves</th>
                             <th className="att-th" style={{ textAlign: 'center' }}>Total Videos</th>
-                            <th className="att-th" style={{ textAlign: 'center' }}>Total Office Hours</th>
+                            <th className="att-th" style={{ textAlign: 'center' }}>Recorded Hours</th>
+                            <th className="att-th" style={{ textAlign: 'center' }}>Office Hours</th>
                             <th className="att-th" style={{ textAlign: 'center' }}>Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         {isLoading ? (
-                            <tr><td colSpan="6" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading roster...</td></tr>
+                            <tr><td colSpan="7" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading roster...</td></tr>
                         ) : attendance.length > 0 ? (
                             attendance.map((record) => {
                                 const leaves = Math.max(0, expectedWorkingDays - record.presentDays);
@@ -215,7 +254,8 @@ export default function AttendanceDashboard() {
                                         <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: '#10b981' }}>{record.presentDays} / {expectedWorkingDays}</td>
                                         <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: leaves > 0 ? '#ef4444' : 'var(--text-muted)' }}>{leaves}</td>
                                         <td style={{ padding: '16px', textAlign: 'center', fontWeight: '600' }}>{record.totalVideos}</td>
-                                        <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: 'var(--primary)' }}>{formatOfficeHours(record.totalOfficeDurationSec)}</td>
+                                        <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: 'var(--primary)' }}>{formatOfficeHours(record.totalRecordedSec)}</td>
+                                        <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: 'var(--text-main)' }}>{formatOfficeHours(record.totalOfficeDurationSec)}</td>
                                         <td style={{ padding: '16px', textAlign: 'center' }}>
                                             <button className="view-details-btn" onClick={() => setSelectedProducer(record)}>
                                                 <Eye size={14} /> Details
@@ -225,7 +265,7 @@ export default function AttendanceDashboard() {
                                 )
                             })
                         ) : (
-                            <tr><td colSpan="6" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>No records found.</td></tr>
+                            <tr><td colSpan="7" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>No records found.</td></tr>
                         )}
                     </tbody>
                 </table>
@@ -256,29 +296,39 @@ export default function AttendanceDashboard() {
                         const isSingleVideo = day.totalVideos === 1;
                         return (
                             <div key={idx} className="daily-record-card">
-                                <div style={{ fontWeight: '600', color: 'var(--primary)', marginBottom: '8px' }}>
+                                <div style={{ fontWeight: '600', color: 'var(--primary)', marginBottom: '12px' }}>
                                     {new Date(day.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
                                 </div>
-                                <div className="daily-stats-grid">
+                                
+                                <div className="daily-stats-grid" style={{ gridTemplateColumns: '1fr 1fr', rowGap: '16px', columnGap: '12px' }}>
+                                    {/* Row 1: Check In/Out */}
                                     <div>
                                         <div className="daily-label">Check In</div>
-                                        <div style={{ fontWeight: 'bold', color: '#10b981' }}>{formatTimeIST(day.checkIn)}</div>
+                                        <div style={{ fontWeight: 'bold', color: '#10b981', fontSize: '14px' }}>{formatTimeIST(day.checkIn)}</div>
                                     </div>
                                     <div>
                                         <div className="daily-label">Check Out</div>
-                                        <div style={{ fontWeight: 'bold', color: isSingleVideo ? 'var(--text-muted)' : '#f59e0b' }}>
+                                        <div style={{ fontWeight: 'bold', color: isSingleVideo ? 'var(--text-muted)' : '#f59e0b', fontSize: '14px' }}>
                                             {isSingleVideo ? 'N/A' : formatTimeIST(day.checkOut)}
                                         </div>
                                     </div>
+                                    
+                                    {/* Row 2: Duration Stats */}
                                     <div>
-                                        <div className="daily-label">Videos</div>
-                                        <div style={{ fontWeight: 'bold' }}>
-                                            {isSingleVideo ? <span style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '4px' }}><AlertCircle size={12}/> 1</span> : day.totalVideos}
-                                        </div>
+                                        <div className="daily-label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Video size={12}/> Recorded</div>
+                                        <div style={{ fontWeight: 'bold', color: 'var(--primary)', fontSize: '14px' }}>{formatOfficeHours(day.recordedSec)}</div>
                                     </div>
                                     <div>
-                                        <div className="daily-label">Hours</div>
-                                        <div style={{ fontWeight: 'bold', color: 'var(--text-main)' }}>{isSingleVideo ? '0h 0m' : formatOfficeHours(day.officeDurationSec)}</div>
+                                        <div className="daily-label">Office Time</div>
+                                        <div style={{ fontWeight: 'bold', color: 'var(--text-main)', fontSize: '14px' }}>{isSingleVideo ? '0h 0m' : formatOfficeHours(day.officeDurationSec)}</div>
+                                    </div>
+
+                                    {/* Videos Count spans full width below */}
+                                    <div style={{ gridColumn: '1 / -1', background: 'var(--bg-main)', padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span className="daily-label" style={{ margin: 0 }}>Total Videos Submissions:</span>
+                                        <span style={{ fontWeight: 'bold' }}>
+                                            {isSingleVideo ? <span style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '4px' }}><AlertCircle size={12}/> 1</span> : day.totalVideos}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
