@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Calendar, ChevronLeft, ChevronRight, Search, Filter, UserCheck, AlertCircle, X, Eye, ChevronDown, Users, Download, Video } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Search, Filter, UserCheck, AlertCircle, X, Eye, ChevronDown, Users, Download, Video, Clock } from 'lucide-react';
 import { generateAttendancePDF } from '../utils/pdfExport'; 
 import './ProjectDashboard.css'; 
 import './AttendanceDashboard.css';
@@ -50,6 +50,10 @@ const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder }) => 
 };
 
 export default function AttendanceDashboard() {
+    // --- UI TABS ---
+    const [activeTab, setActiveTab] = useState('LIVE'); // 'LIVE' or 'HISTORY'
+
+    // --- STATE ---
     const [attendance, setAttendance] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isExporting, setIsExporting] = useState(false);
@@ -57,7 +61,7 @@ export default function AttendanceDashboard() {
 
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
-    const [activeFilterBtn, setActiveFilterBtn] = useState('thisWeek');
+    const [activeFilterBtn, setActiveFilterBtn] = useState('thisMonth');
     const [teamCategory, setTeamCategory] = useState('ALL');
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -69,7 +73,7 @@ export default function AttendanceDashboard() {
     const [selectedProducer, setSelectedProducer] = useState(null);
 
     useEffect(() => {
-        applyQuickFilter('thisWeek');
+        applyQuickFilter('thisMonth');
         fetchTeams();
     }, []);
 
@@ -170,115 +174,194 @@ export default function AttendanceDashboard() {
         return `${h}h ${m}m`;
     };
 
+    // --- LIVE SHIFT LOGIC (Fallback grouping until backend provides shift_type) ---
+    const getShiftGroups = () => {
+        const groups = {
+            'Morning (7 AM - 3 PM)': [],
+            'Regular (9 AM - 5 PM)': [],
+            'Evening (3 PM - 11 PM)': [],
+            'Night (9 PM - 7 AM)': []
+        };
+
+        // For "Live", we only want people who checked in today
+        const todayStr = new Date().toISOString().split('T')[0];
+        
+        attendance.forEach(producer => {
+            const todayRecord = producer.dailyRecords.find(r => r.date.startsWith(todayStr));
+            if (!todayRecord) return; // Not present today
+
+            // Use backend shift if available, otherwise guess via hour
+            if (producer.shift) {
+                if (groups[producer.shift]) groups[producer.shift].push({ producer: producer.producer, ...todayRecord });
+            } else {
+                const hour = new Date(todayRecord.checkIn).getHours();
+                if (hour >= 6 && hour < 9) groups['Morning (7 AM - 3 PM)'].push({ producer: producer.producer, ...todayRecord });
+                else if (hour >= 9 && hour < 14) groups['Regular (9 AM - 5 PM)'].push({ producer: producer.producer, ...todayRecord });
+                else if (hour >= 14 && hour < 20) groups['Evening (3 PM - 11 PM)'].push({ producer: producer.producer, ...todayRecord });
+                else groups['Night (9 PM - 7 AM)'].push({ producer: producer.producer, ...todayRecord });
+            }
+        });
+
+        return groups;
+    };
+
+    const liveShifts = getShiftGroups();
+
     return (
         <div className="dashboard-card" style={{ maxWidth: '1400px', margin: '0 auto' }}>
             
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {/* HEADER & TABS */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <h2 className="dashboard-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'var(--primary)' }}>
-                        <UserCheck size={28} /> Attendance Roster
+                        <UserCheck size={28} /> Attendance
                     </h2>
                     
-                    <div className="quick-filters-container" style={{ marginTop: '12px' }}>
-                        <button className={`quick-filter-btn ${activeFilterBtn === 'today' ? 'active' : ''}`} onClick={() => applyQuickFilter('today')}>Today</button>
-                        <button className={`quick-filter-btn ${activeFilterBtn === 'yesterday' ? 'active' : ''}`} onClick={() => applyQuickFilter('yesterday')}>Yesterday</button>
-                        <button className={`quick-filter-btn ${activeFilterBtn === 'thisWeek' ? 'active' : ''}`} onClick={() => applyQuickFilter('thisWeek')}>This Week</button>
-                        <button className={`quick-filter-btn ${activeFilterBtn === 'thisMonth' ? 'active' : ''}`} onClick={() => applyQuickFilter('thisMonth')}>This Month</button>
+                    {/* TAB NAVIGATION */}
+                    <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-secondary)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                        <button 
+                            onClick={() => setActiveTab('LIVE')}
+                            style={{ padding: '8px 16px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px', background: activeTab === 'LIVE' ? 'var(--primary)' : 'transparent', color: activeTab === 'LIVE' ? '#fff' : 'var(--text-muted)' }}
+                        >
+                            Live Shifts
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('HISTORY')}
+                            style={{ padding: '8px 16px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px', background: activeTab === 'HISTORY' ? 'var(--primary)' : 'transparent', color: activeTab === 'HISTORY' ? '#fff' : 'var(--text-muted)' }}
+                        >
+                            Historical Roster
+                        </button>
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <div className="qc-filter-wrapper search-wrapper">
-                        <Search size={16} color="var(--text-muted)" />
-                        <input type="text" placeholder="Search Producer..." value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }} className="attendance-search" />
+                {/* FILTERS (Only show on History Tab) */}
+                {activeTab === 'HISTORY' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '12px' }}>
+                        <div className="quick-filters-container">
+                            <button className={`quick-filter-btn ${activeFilterBtn === 'today' ? 'active' : ''}`} onClick={() => applyQuickFilter('today')}>Today</button>
+                            <button className={`quick-filter-btn ${activeFilterBtn === 'yesterday' ? 'active' : ''}`} onClick={() => applyQuickFilter('yesterday')}>Yesterday</button>
+                            <button className={`quick-filter-btn ${activeFilterBtn === 'thisWeek' ? 'active' : ''}`} onClick={() => applyQuickFilter('thisWeek')}>This Week</button>
+                            <button className={`quick-filter-btn ${activeFilterBtn === 'thisMonth' ? 'active' : ''}`} onClick={() => applyQuickFilter('thisMonth')}>This Month</button>
+                        </div>
+                        
+                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                            <div className="qc-filter-wrapper search-wrapper">
+                                <Search size={16} color="var(--text-muted)" />
+                                <input type="text" placeholder="Search Producer..." value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }} className="attendance-search" />
+                            </div>
+
+                            <CustomSelect icon={Users} value={teamCategory} onChange={(val) => { setTeamCategory(val); setPage(1); }} options={[{ value: 'ALL', label: 'All Teams' }, ...teams.map(t => ({ value: t, label: t }))]} />
+
+                            <div className="qc-filter-wrapper">
+                                <Calendar size={16} color="var(--text-muted)" />
+                                <input type="date" value={startDate} onChange={(e) => handleManualDateChange(setStartDate, e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none' }} />
+                                <span style={{ color: 'var(--text-muted)' }}>to</span>
+                                <input type="date" value={endDate} onChange={(e) => handleManualDateChange(setEndDate, e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none' }} />
+                            </div>
+
+                            <button onClick={handleExportPDF} disabled={totalRecords === 0 || isExporting} style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: totalRecords === 0 ? 'var(--bg-secondary)' : 'var(--primary)', color: totalRecords === 0 ? 'var(--text-muted)' : 'white', border: totalRecords === 0 ? '1px solid var(--border-color)' : 'none', padding: '0 16px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: totalRecords === 0 ? 'not-allowed' : 'pointer', height: '40px' }}>
+                                <Download size={16} /> {isExporting ? 'Generating...' : 'Export PDF'}
+                            </button>
+                        </div>
                     </div>
-
-                    <CustomSelect 
-                        icon={Users}
-                        value={teamCategory}
-                        onChange={(val) => { setTeamCategory(val); setPage(1); }}
-                        options={[{ value: 'ALL', label: 'All Teams' }, ...teams.map(t => ({ value: t, label: t }))]}
-                    />
-
-                    <div className="qc-filter-wrapper">
-                        <Calendar size={16} color="var(--text-muted)" />
-                        <input type="date" value={startDate} onChange={(e) => handleManualDateChange(setStartDate, e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none' }} />
-                        <span style={{ color: 'var(--text-muted)' }}>to</span>
-                        <input type="date" value={endDate} onChange={(e) => handleManualDateChange(setEndDate, e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none' }} />
-                    </div>
-
-                    <button 
-                        onClick={handleExportPDF}
-                        disabled={totalRecords === 0 || isExporting}
-                        style={{
-                            display: 'flex', alignItems: 'center', gap: '8px',
-                            backgroundColor: totalRecords === 0 ? 'var(--bg-secondary)' : 'var(--primary)',
-                            color: totalRecords === 0 ? 'var(--text-muted)' : 'white',
-                            border: totalRecords === 0 ? '1px solid var(--border-color)' : 'none',
-                            padding: '0 16px', borderRadius: '8px', fontSize: '14px', fontWeight: '600',
-                            cursor: totalRecords === 0 ? 'not-allowed' : 'pointer', height: '40px',
-                            boxShadow: totalRecords === 0 ? 'none' : '0 2px 4px rgba(59, 130, 246, 0.3)',
-                            transition: 'all 0.2s',
-                        }}
-                        onMouseEnter={(e) => { if(totalRecords > 0) e.currentTarget.style.backgroundColor = '#2563eb' }}
-                        onMouseLeave={(e) => { if(totalRecords > 0) e.currentTarget.style.backgroundColor = 'var(--primary)' }}
-                    >
-                        <Download size={16} />
-                        {isExporting ? 'Generating...' : 'Export PDF'}
-                    </button>
-                </div>
+                )}
             </div>
 
-            <div style={{ background: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', overflowX: 'auto', marginBottom: '16px' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                    <thead>
-                        <tr>
-                            <th className="att-th">Producer</th>
-                            <th className="att-th" style={{ textAlign: 'center' }}>Present Days</th>
-                            <th className="att-th" style={{ textAlign: 'center' }}>Leaves</th>
-                            <th className="att-th" style={{ textAlign: 'center' }}>Total Videos</th>
-                            <th className="att-th" style={{ textAlign: 'center' }}>Recorded Hours</th>
-                            <th className="att-th" style={{ textAlign: 'center' }}>Office Hours</th>
-                            <th className="att-th" style={{ textAlign: 'center' }}>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {isLoading ? (
-                            <tr><td colSpan="7" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading roster...</td></tr>
-                        ) : attendance.length > 0 ? (
-                            attendance.map((record) => {
-                                const leaves = Math.max(0, expectedWorkingDays - record.presentDays);
-                                return (
-                                    <tr key={record.producer} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                        <td style={{ padding: '16px', color: 'var(--text-main)', fontWeight: '600' }}>{record.producer}</td>
-                                        <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: '#10b981' }}>{record.presentDays} / {expectedWorkingDays}</td>
-                                        <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: leaves > 0 ? '#ef4444' : 'var(--text-muted)' }}>{leaves}</td>
-                                        <td style={{ padding: '16px', textAlign: 'center', fontWeight: '600' }}>{record.totalVideos}</td>
-                                        <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: 'var(--primary)' }}>{formatOfficeHours(record.totalRecordedSec)}</td>
-                                        <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: 'var(--text-main)' }}>{formatOfficeHours(record.totalOfficeDurationSec)}</td>
-                                        <td style={{ padding: '16px', textAlign: 'center' }}>
-                                            <button className="view-details-btn" onClick={() => setSelectedProducer(record)}>
-                                                <Eye size={14} /> Details
-                                            </button>
-                                        </td>
-                                    </tr>
-                                )
-                            })
-                        ) : (
-                            <tr><td colSpan="7" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>No records found.</td></tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
+            <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', marginBottom: '24px' }} />
 
-            {totalPages > 1 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0' }}>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Page <span style={{ fontWeight: 'bold', color: 'var(--text-main)' }}>{page}</span> of {totalPages}</div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                        <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="att-page-btn"><ChevronLeft size={16} /> Prev</button>
-                        <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="att-page-btn">Next <ChevronRight size={16} /></button>
-                    </div>
+            {/* ============================== */}
+            {/* VIEW 1: LIVE SHIFTS */}
+            {/* ============================== */}
+            {activeTab === 'LIVE' && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+                    {Object.entries(liveShifts).map(([shiftName, producers]) => (
+                        <div key={shiftName} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden' }}>
+                            <div style={{ background: 'var(--primary)', padding: '12px 16px', color: 'white', fontWeight: '600', display: 'flex', justifyContent: 'space-between' }}>
+                                <span>{shiftName}</span>
+                                <span style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 8px', borderRadius: '12px', fontSize: '12px' }}>{producers.length} Present</span>
+                            </div>
+                            <div style={{ padding: '16px', maxHeight: '400px', overflowY: 'auto' }}>
+                                {producers.length === 0 ? (
+                                    <div style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', padding: '20px 0' }}>No active producers in this shift.</div>
+                                ) : (
+                                    producers.map((p, i) => (
+                                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: i !== producers.length -1 ? '1px solid var(--border-color)' : 'none' }}>
+                                            <div>
+                                                <div style={{ fontWeight: '600', color: 'var(--text-main)', fontSize: '14px' }}>{p.producer}</div>
+                                                <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', gap: '8px', marginTop: '4px' }}>
+                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Clock size={12}/> In: {formatTimeIST(p.checkIn)}</span>
+                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Video size={12}/> {p.totalVideos} vids</span>
+                                                </div>
+                                            </div>
+                                            <div style={{ fontWeight: 'bold', color: 'var(--primary)', fontSize: '13px' }}>
+                                                {formatOfficeHours(p.officeDurationSec)}
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    ))}
                 </div>
+            )}
+
+            {/* ============================== */}
+            {/* VIEW 2: HISTORICAL ROSTER */}
+            {/* ============================== */}
+            {activeTab === 'HISTORY' && (
+                <>
+                    <div style={{ background: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', overflowX: 'auto', marginBottom: '16px' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                            <thead>
+                                <tr>
+                                    <th className="att-th">Producer</th>
+                                    <th className="att-th" style={{ textAlign: 'center' }}>Present Days</th>
+                                    <th className="att-th" style={{ textAlign: 'center' }}>Leaves</th>
+                                    <th className="att-th" style={{ textAlign: 'center' }}>Total Videos</th>
+                                    <th className="att-th" style={{ textAlign: 'center' }}>Recorded Hours</th>
+                                    <th className="att-th" style={{ textAlign: 'center' }}>Office Hours</th>
+                                    <th className="att-th" style={{ textAlign: 'center' }}>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {isLoading ? (
+                                    <tr><td colSpan="7" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading roster...</td></tr>
+                                ) : attendance.length > 0 ? (
+                                    attendance.map((record) => {
+                                        const leaves = Math.max(0, expectedWorkingDays - record.presentDays);
+                                        return (
+                                            <tr key={record.producer} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                                <td style={{ padding: '16px', color: 'var(--text-main)', fontWeight: '600' }}>{record.producer}</td>
+                                                <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: '#10b981' }}>{record.presentDays} / {expectedWorkingDays}</td>
+                                                <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: leaves > 0 ? '#ef4444' : 'var(--text-muted)' }}>{leaves}</td>
+                                                <td style={{ padding: '16px', textAlign: 'center', fontWeight: '600' }}>{record.totalVideos}</td>
+                                                <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: 'var(--primary)' }}>{formatOfficeHours(record.totalRecordedSec)}</td>
+                                                <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: 'var(--text-main)' }}>{formatOfficeHours(record.totalOfficeDurationSec)}</td>
+                                                <td style={{ padding: '16px', textAlign: 'center' }}>
+                                                    <button className="view-details-btn" onClick={() => setSelectedProducer(record)}>
+                                                        <Eye size={14} /> Details
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        )
+                                    })
+                                ) : (
+                                    <tr><td colSpan="7" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>No records found.</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {totalPages > 1 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0' }}>
+                            <div style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Page <span style={{ fontWeight: 'bold', color: 'var(--text-main)' }}>{page}</span> of {totalPages}</div>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="att-page-btn"><ChevronLeft size={16} /> Prev</button>
+                                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="att-page-btn">Next <ChevronRight size={16} /></button>
+                            </div>
+                        </div>
+                    )}
+                </>
             )}
 
             {/* --- RIGHT OVERLAY SIDEBAR --- */}
@@ -301,19 +384,17 @@ export default function AttendanceDashboard() {
                                 </div>
                                 
                                 <div className="daily-stats-grid" style={{ gridTemplateColumns: '1fr 1fr', rowGap: '16px', columnGap: '12px' }}>
-                                    {/* Row 1: Check In/Out */}
                                     <div>
-                                        <div className="daily-label">Check In</div>
+                                        <div className="daily-label">First Video Recorded</div>
                                         <div style={{ fontWeight: 'bold', color: '#10b981', fontSize: '14px' }}>{formatTimeIST(day.checkIn)}</div>
                                     </div>
                                     <div>
-                                        <div className="daily-label">Check Out</div>
+                                        <div className="daily-label">Last Video Recorded</div>
                                         <div style={{ fontWeight: 'bold', color: isSingleVideo ? 'var(--text-muted)' : '#f59e0b', fontSize: '14px' }}>
                                             {isSingleVideo ? 'N/A' : formatTimeIST(day.checkOut)}
                                         </div>
                                     </div>
                                     
-                                    {/* Row 2: Duration Stats */}
                                     <div>
                                         <div className="daily-label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Video size={12}/> Recorded</div>
                                         <div style={{ fontWeight: 'bold', color: 'var(--primary)', fontSize: '14px' }}>{formatOfficeHours(day.recordedSec)}</div>
@@ -323,7 +404,6 @@ export default function AttendanceDashboard() {
                                         <div style={{ fontWeight: 'bold', color: 'var(--text-main)', fontSize: '14px' }}>{isSingleVideo ? '0h 0m' : formatOfficeHours(day.officeDurationSec)}</div>
                                     </div>
 
-                                    {/* Videos Count spans full width below */}
                                     <div style={{ gridColumn: '1 / -1', background: 'var(--bg-main)', padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <span className="daily-label" style={{ margin: 0 }}>Total Videos Submissions:</span>
                                         <span style={{ fontWeight: 'bold' }}>

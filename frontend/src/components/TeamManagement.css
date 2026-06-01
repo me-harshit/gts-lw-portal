@@ -138,3 +138,44 @@
     opacity: 0.6;
     cursor: not-allowed;
 }
+
+.tm-input {
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-main);
+    color: var(--text-main);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+}
+.tm-input:focus {
+    border-color: var(--primary);
+}
+
+.producer-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: var(--bg-main);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer; /* Changed to pointer for click-to-select */
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.producer-card:hover {
+    border-color: var(--primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+/* Highlight style when a card is checked */
+.producer-card.selected {
+    background: rgba(59, 130, 246, 0.05);
+    border-color: var(--primary);
+}
