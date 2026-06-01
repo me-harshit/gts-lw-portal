@@ -7,7 +7,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const SHIFTS = [
     "Morning (7 AM - 3 PM)",
-    "Regular (9 AM - 5 PM)",
+    "Regular (9 AM - 6 PM)",
     "Evening (3 PM - 11 PM)",
     "Night (9 PM - 5 AM)",
     "Night (11 PM - 7 AM)"

@@ -1,3 +1,123 @@
+/* ========================================================= */
+/* --- CUSTOM DROPDOWN UI --- */
+/* ========================================================= */
+.custom-dropdown-container { 
+    position: relative; 
+}
+
+.custom-dropdown-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 14px; 
+    background: rgba(59, 130, 246, 0.08); 
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 8px;
+    cursor: pointer; 
+    color: var(--text-main); 
+    font-size: 13px;
+    font-weight: 600; 
+    transition: all 0.2s ease; 
+    box-sizing: border-box;
+}
+
+.custom-dropdown-header:hover { 
+    background: rgba(59, 130, 246, 0.12);
+    border-color: rgba(59, 130, 246, 0.5); 
+}
+
+.custom-dropdown-menu {
+    position: absolute; 
+    top: 100%; 
+    left: 0; 
+    right: 0; 
+    margin-top: 4px;
+    background-color: var(--bg-main, #ffffff) !important; 
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    border-radius: 8px; 
+    box-shadow: 0 12px 40px rgba(0,0,0,0.3), 0 0 0 1px rgba(59, 130, 246, 0.1); 
+    z-index: 1000; 
+    overflow: hidden;
+}
+
+body.dark-mode .custom-dropdown-menu {
+    background-color: var(--bg-main, #1e1e2d) !important;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.7);
+}
+
+.custom-dropdown-list { 
+    max-height: 250px; overflow-y: auto; margin: 0; padding: 0; list-style: none; 
+}
+
+.custom-dropdown-item { 
+    padding: 10px 14px; 
+    cursor: pointer; 
+    color: var(--text-main); 
+    font-size: 13px; 
+    font-weight: 500;
+    transition: background-color 0.1s ease; 
+}
+
+.custom-dropdown-item:hover { 
+    background-color: rgba(59, 130, 246, 0.15); 
+    color: var(--primary); 
+}
+
+.custom-dropdown-item.active { 
+    background-color: var(--primary); 
+    color: white; 
+}
+
+/* ========================================================= */
+/* --- FORMS & INPUTS --- */
+/* ========================================================= */
+.tm-input {
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-main);
+    color: var(--text-main);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.tm-input:focus {
+    border-color: var(--primary);
+}
+
+.add-team-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 0 16px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    height: 40px; /* Matched height with custom selects */
+    transition: background-color 0.2s, opacity 0.2s;
+    white-space: nowrap;
+}
+
+.add-team-btn:hover:not(:disabled) {
+    background-color: #2563eb;
+}
+
+.add-team-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ========================================================= */
+/* --- KANBAN BOARD LAYOUT --- */
+/* ========================================================= */
 .team-board {
     display: flex;
     gap: 24px;
@@ -22,7 +142,7 @@
     border-bottom: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     font-weight: 600;
     color: var(--text-main);
 }
@@ -33,6 +153,7 @@
     border-radius: 12px;
     font-size: 12px;
     color: var(--text-muted);
+    border: 1px solid var(--border-color);
 }
 
 .team-dropzone {
@@ -45,115 +166,13 @@
 
 /* Highlight the column when hovering over it with a dragged card */
 .team-dropzone.drag-over {
-    background-color: rgba(16, 185, 129, 0.05); /* Slight green tint */
+    background-color: rgba(16, 185, 129, 0.05);
     border: 1px dashed #10b981;
 }
 
-.producer-card {
-    background: var(--bg-main);
-    border: 1px solid var(--border-color);
-    padding: 10px 14px;
-    border-radius: 8px;
-    margin-bottom: 12px;
-    cursor: grab;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
-}
-
-.producer-card:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-    border-color: var(--primary);
-}
-
-.producer-card:active {
-    cursor: grabbing;
-    transform: scale(0.98);
-}
-
-/* --- Top Controls Styling --- */
-
-.team-search-input {
-    width: 100%;
-    padding: 8px 16px 8px 36px; /* Space for icon */
-    border-radius: 6px;
-    border: 1px solid var(--border-color);
-    background: var(--bg-secondary);
-    color: var(--text-main);
-    outline: none;
-    font-size: 13px;
-    height: 36px;
-    transition: border-color 0.2s;
-}
-
-.team-search-input:focus {
-    border-color: var(--primary);
-}
-
-.new-team-form {
-    display: flex;
-    gap: 8px;
-    margin: 0;
-}
-
-.new-team-input-field {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    color: var(--text-main);
-    padding: 8px 12px;
-    border-radius: 6px;
-    outline: none;
-    width: 220px;
-    font-size: 13px;
-    height: 36px;
-    transition: border-color 0.2s;
-}
-
-.new-team-input-field:focus {
-    border-color: var(--primary);
-}
-
-.add-team-btn {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 0 16px;
-    background: var(--primary);
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    height: 36px;
-    transition: background-color 0.2s, opacity 0.2s;
-}
-
-.add-team-btn:hover:not(:disabled) {
-    background-color: #2563eb;
-}
-
-.add-team-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.tm-input {
-    padding: 8px 12px;
-    border-radius: 6px;
-    border: 1px solid var(--border-color);
-    background: var(--bg-main);
-    color: var(--text-main);
-    font-size: 13px;
-    outline: none;
-    transition: border-color 0.2s;
-    width: 100%;
-}
-.tm-input:focus {
-    border-color: var(--primary);
-}
-
+/* ========================================================= */
+/* --- PRODUCER CARDS (Drag & Multi-Select) --- */
+/* ========================================================= */
 .producer-card {
     display: flex;
     justify-content: space-between;
@@ -162,8 +181,8 @@
     background: var(--bg-main);
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    margin-bottom: 8px;
-    cursor: pointer; /* Changed to pointer for click-to-select */
+    margin-bottom: 10px;
+    cursor: pointer; 
     transition: all 0.2s ease;
     user-select: none;
 }
@@ -171,11 +190,16 @@
 .producer-card:hover {
     border-color: var(--primary);
     transform: translateY(-2px);
-    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 
 /* Highlight style when a card is checked */
 .producer-card.selected {
-    background: rgba(59, 130, 246, 0.05);
+    background: rgba(59, 130, 246, 0.08);
     border-color: var(--primary);
+}
+
+/* Visual feedback when clicking/dragging */
+.producer-card:active {
+    transform: scale(0.98);
 }
