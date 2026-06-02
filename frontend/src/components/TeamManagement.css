@@ -203,3 +203,62 @@ body.dark-mode .custom-dropdown-menu {
 .producer-card:active {
     transform: scale(0.98);
 }
+
+/* --- MODAL OVERLAY --- */
+.tm-modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(4px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.tm-modal {
+    background: var(--bg-main);
+    border: 1px solid var(--border-color);
+    padding: 24px;
+    border-radius: 12px;
+    width: 400px;
+    max-width: 90vw;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+body.dark-mode .tm-modal {
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+}
+
+/* ========================================================= */
+/* --- SYSTEM CONFIGURATION ACCORDION ANIMATIONS --- */
+/* ========================================================= */
+
+/* Rotating Arrow on the button */
+.config-chevron {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.config-chevron.open {
+    transform: rotate(-180deg);
+}
+
+/* The Sliding Wrapper */
+.config-panel-wrapper {
+    display: grid;
+    grid-template-rows: 0fr; /* Starts collapsed */
+    opacity: 0;
+    transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+    pointer-events: none; /* Prevents clicks while hidden */
+}
+
+.config-panel-wrapper.open {
+    grid-template-rows: 1fr; /* Expands smoothly to fit content */
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* The inner container must hide overflow for the grid trick to work */
+.config-panel-inner {
+    overflow: hidden;
+}
