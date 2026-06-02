@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Calendar, ChevronLeft, ChevronRight, Search, Filter, UserCheck, AlertCircle, X, ChevronDown, Users, Download, Video, Clock, Tag as TagIcon, Eye } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Search, UserCheck, AlertCircle, X, ChevronDown, Users, Download, Video, Clock, Tag as TagIcon, Eye, Loader2 } from 'lucide-react';
 import { generateAttendancePDF } from '../utils/pdfExport'; 
 import './ProjectDashboard.css'; 
 import './AttendanceDashboard.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
+// --- FIXED CUSTOM SELECT COMPONENT ---
 const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder, containerStyle }) => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
@@ -22,11 +23,13 @@ const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder, conta
     const selectedLabel = options.find(o => o.value === value)?.label || placeholder;
 
     return (
-        <div className="custom-dropdown-container" style={containerStyle || { width: 'auto', minWidth: '160px' }} ref={dropdownRef}>
-            <div className="custom-dropdown-header" onClick={() => setIsOpen(!isOpen)} style={{ height: '100%' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                    {Icon && <Icon size={16} color="var(--text-muted)" />}
-                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedLabel}</span>
+        <div className="custom-dropdown-container" style={containerStyle || { width: '200px' }} ref={dropdownRef}>
+            <div className="custom-dropdown-header" onClick={() => setIsOpen(!isOpen)} style={{ height: '100%', width: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
+                    {Icon && <Icon size={16} color="var(--text-muted)" style={{ flexShrink: 0 }} />}
+                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', width: '100%' }}>
+                        {selectedLabel}
+                    </span>
                 </div>
                 <ChevronDown size={16} color="var(--text-muted)" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s', flexShrink: 0 }} />
             </div>
@@ -95,7 +98,6 @@ export default function AttendanceDashboard() {
     const monthFilters = generateMonthFilters();
 
     useEffect(() => {
-        // Default to the most recent month
         if (monthFilters.length > 0) applyMonthFilter(monthFilters[0].value);
         fetchMetadata();
     }, []);
@@ -119,7 +121,6 @@ export default function AttendanceDashboard() {
         const fetchAttendance = async () => {
             setIsLoading(true);
             try {
-                // Determine matching teams based on filters
                 let matchingTeams = teamConfigs;
                 if (activeTag !== 'ALL') matchingTeams = matchingTeams.filter(t => t.tag === activeTag);
                 if (activeShift !== 'ALL') matchingTeams = matchingTeams.filter(t => t.timingSlot === activeShift);
@@ -127,7 +128,7 @@ export default function AttendanceDashboard() {
 
                 let teamQuery = 'ALL';
                 if ((activeTag !== 'ALL' || activeShift !== 'ALL' || teamCategory !== 'ALL') && matchingTeams.length === 0) {
-                    teamQuery = '___NONE___'; // Filters applied but no teams match
+                    teamQuery = '___NONE___'; 
                 } else if (activeTag !== 'ALL' || activeShift !== 'ALL' || teamCategory !== 'ALL') {
                     teamQuery = matchingTeams.map(t => t.name).join(',');
                 }
@@ -170,7 +171,7 @@ export default function AttendanceDashboard() {
         let count = 0;
         let current = new Date(start);
         while (current <= end) {
-            count++; // SUNDAYS NOW INCLUDED
+            count++; 
             current.setDate(current.getDate() + 1);
         }
         return count;
@@ -215,7 +216,6 @@ export default function AttendanceDashboard() {
     const renderCalendar = () => {
         if (!startDate) return null;
         
-        // Base the calendar strictly on the month of the startDate
         const start = new Date(startDate);
         const y = start.getFullYear();
         const m = start.getMonth();
@@ -225,12 +225,10 @@ export default function AttendanceDashboard() {
         
         const days = [];
         
-        // Add blank cells for offset
         for (let i = 0; i < firstDayOfMonth.getDay(); i++) {
             days.push(null);
         }
         
-        // Add actual days
         for (let i = 1; i <= lastDayOfMonth.getDate(); i++) {
             days.push(new Date(y, m, i));
         }
@@ -266,52 +264,84 @@ export default function AttendanceDashboard() {
     return (
         <div className="dashboard-card" style={{ maxWidth: '1400px', margin: '0 auto' }}>
             
-            {/* HEADER & FILTERS */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <h2 className="dashboard-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'var(--primary)' }}>
-                        <UserCheck size={28} /> Detailed Roster
-                    </h2>
-                    
-                    {/* MONTH FILTERS */}
-                    <div className="quick-filters-container">
-                        {monthFilters.map(month => (
-                            <button 
-                                key={month.value.getTime()}
-                                className={`quick-filter-btn ${activeMonthFilter === month.value.getTime().toString() ? 'active' : ''}`} 
-                                onClick={() => applyMonthFilter(month.value)}
-                            >
-                                {month.label}
-                            </button>
-                        ))}
-                    </div>
+            {/* ============================== */}
+            {/* HEADER & NEW CLEAN ROW LAYOUT */}
+            {/* ============================== */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '24px' }}>
+                
+                {/* Title */}
+                <h2 className="dashboard-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'var(--primary)' }}>
+                    <UserCheck size={28} /> Detailed Roster
+                </h2>
+
+                {/* ROW 1: Month Filters */}
+                <div className="quick-filters-container">
+                    {monthFilters.map(month => (
+                        <button 
+                            key={month.value.getTime()}
+                            className={`quick-filter-btn ${activeMonthFilter === month.value.getTime().toString() ? 'active' : ''}`} 
+                            onClick={() => applyMonthFilter(month.value)}
+                        >
+                            {month.label}
+                        </button>
+                    ))}
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '12px' }}>
+                {/* ROW 2: All Other Filters, Search & Export grouped nicely */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                    
+                    {/* LEFT SIDE: Dropdowns & Date Picker */}
                     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <CustomSelect 
+                            icon={TagIcon} 
+                            value={activeTag} 
+                            onChange={(val) => { setActiveTag(val); setPage(1); }} 
+                            options={[{ value: 'ALL', label: 'All Tags' }, ...tags.map(t => ({ value: t, label: t }))]} 
+                            containerStyle={{ width: '160px', height: '40px' }} 
+                        />
                         
-                        <CustomSelect icon={TagIcon} value={activeTag} onChange={(val) => { setActiveTag(val); setPage(1); }} options={[{ value: 'ALL', label: 'All Tags' }, ...tags.map(t => ({ value: t, label: t }))]} containerStyle={{ height: '36px' }} />
-                        <CustomSelect icon={Clock} value={activeShift} onChange={(val) => { setActiveShift(val); setPage(1); }} options={[{ value: 'ALL', label: 'All Shifts' }, ...shifts.map(s => ({ value: s, label: s }))]} containerStyle={{ height: '36px' }} />
-                        <CustomSelect icon={Users} value={teamCategory} onChange={(val) => { setTeamCategory(val); setPage(1); }} options={[{ value: 'ALL', label: 'All Teams' }, ...teams.map(t => ({ value: t, label: t }))]} containerStyle={{ height: '36px' }} />
+                        <CustomSelect 
+                            icon={Clock} 
+                            value={activeShift} 
+                            onChange={(val) => { setActiveShift(val); setPage(1); }} 
+                            options={[{ value: 'ALL', label: 'All Shifts' }, ...shifts.map(s => ({ value: s, label: s }))]} 
+                            containerStyle={{ width: '180px', height: '40px' }} 
+                        />
+                        
+                        <CustomSelect 
+                            icon={Users} 
+                            value={teamCategory} 
+                            onChange={(val) => { setTeamCategory(val); setPage(1); }} 
+                            options={[{ value: 'ALL', label: 'All Teams' }, ...teams.map(t => ({ value: t, label: t }))]} 
+                            containerStyle={{ width: '160px', height: '40px' }} 
+                        />
 
-                        <div className="qc-filter-wrapper search-wrapper">
-                            <Search size={16} color="var(--text-muted)" />
-                            <input type="text" placeholder="Search Producer..." value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }} className="attendance-search" />
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                        <div className="qc-filter-wrapper">
+                        <div className="qc-filter-wrapper" style={{ height: '40px' }}>
                             <Calendar size={16} color="var(--text-muted)" />
                             <input type="date" value={startDate} onChange={(e) => handleManualDateChange(setStartDate, e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none' }} />
                             <span style={{ color: 'var(--text-muted)' }}>to</span>
                             <input type="date" value={endDate} onChange={(e) => handleManualDateChange(setEndDate, e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none' }} />
                         </div>
+                    </div>
 
-                        <button onClick={handleExportPDF} disabled={totalRecords === 0 || isExporting} style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: totalRecords === 0 ? 'var(--bg-secondary)' : 'var(--primary)', color: totalRecords === 0 ? 'var(--text-muted)' : 'white', border: totalRecords === 0 ? '1px solid var(--border-color)' : 'none', padding: '0 16px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: totalRecords === 0 ? 'not-allowed' : 'pointer', height: '40px' }}>
+                    {/* RIGHT SIDE: Search Bar & Export Button */}
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', flexGrow: 1, justifyContent: 'flex-end' }}>
+                        <div className="qc-filter-wrapper search-wrapper" style={{ height: '40px', maxWidth: '300px', flexGrow: 1 }}>
+                            <Search size={16} color="var(--text-muted)" />
+                            <input 
+                                type="text" 
+                                placeholder="Search Producer..." 
+                                value={searchQuery} 
+                                onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }} 
+                                style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none', fontSize: '13px', width: '100%' }} 
+                            />
+                        </div>
+
+                        <button onClick={handleExportPDF} disabled={totalRecords === 0 || isExporting} style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: totalRecords === 0 ? 'var(--bg-secondary)' : 'var(--primary)', color: totalRecords === 0 ? 'var(--text-muted)' : 'white', border: totalRecords === 0 ? '1px solid var(--border-color)' : 'none', padding: '0 16px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: totalRecords === 0 ? 'not-allowed' : 'pointer', height: '40px', flexShrink: 0 }}>
                             <Download size={16} /> {isExporting ? 'Generating...' : 'Export PDF'}
                         </button>
                     </div>
+
                 </div>
             </div>
 
@@ -331,7 +361,7 @@ export default function AttendanceDashboard() {
                     </thead>
                     <tbody>
                         {isLoading ? (
-                            <tr><td colSpan="7" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading roster...</td></tr>
+                            <tr><td colSpan="7" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}><Loader2 className="spinning" size={24} style={{ margin: '0 auto' }} /></td></tr>
                         ) : attendance.length > 0 ? (
                             attendance.map((record) => {
                                 const leaves = Math.max(0, expectedWorkingDays - record.presentDays);

@@ -25,6 +25,9 @@ const getHeaders = (config) => ({
     'Connection': 'keep-alive'
 });
 
+// THIRTY MINUTES IN MILLISECONDS
+const THIRTY_MINUTES = 30 * 60 * 1000;
+
 export const triggerDashboardSync = async (req, res) => {
     if (globalSyncState.isSyncing) {
         return res.status(409).json({ error: 'A sync operation is already in progress globally.' });
@@ -54,11 +57,14 @@ export const triggerDashboardSync = async (req, res) => {
                 const proj = projects[pIndex];
                 const prefix = projects.length > 1 ? `[${proj.name}] ` : '';
 
+                // ==========================================
+                // 1. CREATE EXPORT (Max 10 Attempts)
+                // ==========================================
                 updateSyncState({ message: `${prefix}Creating Export on Lightwheel...` });
                 let exportId = null;
                 let createAttempts = 0;
 
-                while (createAttempts < 3 && !exportId) {
+                while (createAttempts < 10 && !exportId) {
                     try {
                         createAttempts++;
                         const createRes = await axios.post(
@@ -71,37 +77,62 @@ export const triggerDashboardSync = async (req, res) => {
                         if (err.response && err.response.status === 401) {
                             throw new Error('Lightwheel Token Expired! Please refresh in Admin Settings.');
                         }
-                        if (createAttempts >= 3) throw new Error(`Failed to create export for ${proj.name}.`);
-                        await new Promise(resolve => setTimeout(resolve, 3000));
+                        if (createAttempts >= 10) throw new Error(`Failed to create export for ${proj.name} after 10 attempts.`);
+                        
+                        // IF RATE LIMITED OR SERVER ERROR, WAIT 30 MINS
+                        if (err.response && (err.response.status === 429 || err.response.status >= 500)) {
+                            updateSyncState({ message: `${prefix}Rate Limited on Create. Pausing 30 mins... (Attempt ${createAttempts}/10)` });
+                            await new Promise(resolve => setTimeout(resolve, THIRTY_MINUTES));
+                        } else {
+                            await new Promise(resolve => setTimeout(resolve, 5000));
+                        }
                     }
                 }
 
+                // ==========================================
+                // 2. POLL FOR ZIP COMPILATION (Max 10 Attempts)
+                // ==========================================
                 updateSyncState({ message: `${prefix}Waiting for ZIP compilation...` });
                 let downloadUrl = null;
+                let listAttempts = 0;
 
-                for (let i = 0; i < 40; i++) {
-                    await new Promise(resolve => setTimeout(resolve, 5000));
+                while (listAttempts < 10 && !downloadUrl) {
                     try {
+                        listAttempts++;
+                        // Wait a base time of 30 seconds between checks so we don't spam the server
+                        await new Promise(resolve => setTimeout(resolve, 30000));
+                        
+                        updateSyncState({ message: `${prefix}Checking ZIP Status... (Attempt ${listAttempts}/10)` });
+
                         const listRes = await axios.post(
                             `${config.lightwheelQcApi}/list`,
                             { page: 1, pageSize: 20 },
                             { headers: getHeaders(config), httpsAgent, timeout: 60000 }
                         );
+                        
                         const match = listRes.data.data.find(item => item.id === exportId);
                         if (match && match.downloadUrl) {
                             downloadUrl = match.downloadUrl;
-                            break;
                         }
-                        updateSyncState({ message: `${prefix}Compiling ZIP... (Attempt ${i + 1})` });
                     } catch (pollError) {
                         if (pollError.response && pollError.response.status === 401) {
                             throw new Error('Lightwheel Token Expired! Please refresh in Admin Settings.');
                         }
+                        if (listAttempts >= 10) throw new Error(`${proj.name} Export Timeout: ZIP never finished after 10 checks.`);
+                        
+                        // IF RATE LIMITED, WAIT 30 MINS
+                        if (pollError.response && (pollError.response.status === 429 || pollError.response.status >= 500)) {
+                            updateSyncState({ message: `${prefix}Rate Limited on Check. Pausing 30 mins... (Attempt ${listAttempts}/10)` });
+                            await new Promise(resolve => setTimeout(resolve, THIRTY_MINUTES));
+                        }
                     }
                 }
 
-                if (!downloadUrl) throw new Error(`${proj.name} Export Timeout: ZIP never finished.`);
+                if (!downloadUrl) throw new Error(`${proj.name} Export Timeout: Missing Download URL.`);
 
+                // ==========================================
+                // 3. DOWNLOAD ZIP (Max 10 Attempts)
+                // ==========================================
                 updateSyncState({ message: `${prefix}Downloading ZIP...` });
                 const downloadHeaders = {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -112,17 +143,24 @@ export const triggerDashboardSync = async (req, res) => {
                 let zipRes = null;
                 let downloadAttempts = 0;
 
-                while (downloadAttempts < 3 && !zipRes) {
+                while (downloadAttempts < 10 && !zipRes) {
                     try {
                         downloadAttempts++;
                         zipRes = await axios.get(downloadUrl, {
                             responseType: 'stream',
                             headers: downloadHeaders,
-                            timeout: 300000
+                            timeout: 300000 // 5 minute timeout for massive zips
                         });
                     } catch (err) {
-                        if (downloadAttempts >= 3) throw new Error(`Failed to download ${proj.name}.`);
-                        await new Promise(resolve => setTimeout(resolve, 5000));
+                        if (downloadAttempts >= 10) throw new Error(`Failed to download ${proj.name} after 10 attempts.`);
+                        
+                        // IF RATE LIMITED, WAIT 30 MINS
+                        if (err.response && (err.response.status === 429 || err.response.status >= 500)) {
+                            updateSyncState({ message: `${prefix}Rate Limited on Download. Pausing 30 mins... (Attempt ${downloadAttempts}/10)` });
+                            await new Promise(resolve => setTimeout(resolve, THIRTY_MINUTES));
+                        } else {
+                            await new Promise(resolve => setTimeout(resolve, 5000));
+                        }
                     }
                 }
 
@@ -142,11 +180,8 @@ export const triggerDashboardSync = async (req, res) => {
                 const processBatch = async (rows) => {
                     if (rows.length === 0) return;
                     
-                    // 1. Fetch all existing records for this batch at once (MASSIVE SPEED BOOST)
                     const dataNames = rows.map(r => r.data_name);
                     const existingRecords = await AllRecord.find({ data_name: { $in: dataNames } }).lean();
-                    
-                    // Convert to a quick lookup map
                     const existingMap = new Map(existingRecords.map(r => [r.data_name, r]));
                     const bulkOps = [];
 
@@ -155,35 +190,29 @@ export const triggerDashboardSync = async (req, res) => {
                         let updateDoc = { ...row, project_category: proj.category };
                         let pushHistory = null;
                         
-                        // Parse duration safely
                         const vDuration = parseFloat(row.video_duration) || 0;
 
                         if (localRecord) {
-                            // --- STATUS CHANGE DETECTED ---
                             if (localRecord.inspect_result !== row.inspect_result) {
                                 pushHistory = { status: row.inspect_result || 'PENDING', changedAt: new Date() };
 
-                                // 🚨 THE ANOMALY TRAP: PASSED -> FAILED/PENDING
                                 if (localRecord.inspect_result === 'INSPECT_PASSED' && row.inspect_result !== 'INSPECT_PASSED') {
                                     console.warn(`🚨 [Anomaly] Downgrade Detected: ${row.data_name}`);
                                     updateDoc.is_downgraded = true; 
                                 }
                             }
 
-                            // --- NEWLY PASSED DETECTED ---
                             if (localRecord.inspect_result !== 'INSPECT_PASSED' && row.inspect_result === 'INSPECT_PASSED') {
                                 updateDoc.locked_duration = vDuration;
-                                updateDoc.is_downgraded = false; // Clear flag if it passes again
+                                updateDoc.is_downgraded = false; 
                             }
                         } else {
-                            // --- BRAND NEW RECORD ---
                             if (row.inspect_result === 'INSPECT_PASSED') {
                                 updateDoc.locked_duration = vDuration;
                             }
                             pushHistory = { status: row.inspect_result || 'PENDING', changedAt: new Date() };
                         }
 
-                        // Prepare the MongoDB query
                         const updateQuery = { $set: updateDoc };
                         if (pushHistory) {
                             updateQuery.$push = { status_history: pushHistory };
@@ -198,7 +227,6 @@ export const triggerDashboardSync = async (req, res) => {
                         });
                     }
 
-                    // 2. Execute the smart bulk write
                     await AllRecord.bulkWrite(bulkOps, { ordered: false });
                     totalProcessed += rows.length;
                     updateSyncState({ progress: totalProcessed });
@@ -212,22 +240,22 @@ export const triggerDashboardSync = async (req, res) => {
 
                     batch.push(formattedRow);
 
-                    // Process in chunks of 1000 to balance memory and query limits
                     if (batch.length >= 1000) {
                         await processBatch(batch);
                         batch = [];
                     }
                 }
 
-                // Flush the remaining records
                 if (batch.length > 0) {
                     await processBatch(batch);
                 }
             }
 
+            // Update Final Timestamp
             await AppConfig.findOneAndUpdate(
                 { configId: 'global_settings' },
-                { lastQcSync: new Date() }
+                { lastQcSync: new Date() },
+                { upsert: true }
             );
 
             finishSync('QC Database Synced Successfully!');
@@ -244,7 +272,7 @@ export const triggerDashboardSync = async (req, res) => {
 // ============================================================================
 
 let isTranslationRunning = false;
-let cancelTranslationFlag = false; // <-- NEW KILL SWITCH FLAG
+let cancelTranslationFlag = false; 
 
 export const translationState = {
     isRunning: false,
@@ -254,7 +282,6 @@ export const translationState = {
     message: ''
 };
 
-// The Smart Query: Catches empty EN fields OR EN fields that accidentally contain CN text
 const getTranslationQuery = () => ({
     inspect_result: 'INSPECT_FAILED',
     inspect_issue_description: { $exists: true, $ne: '', $type: 'string' },
@@ -271,7 +298,7 @@ export const getPendingTranslationCount = async (req, res) => {
         const count = await AllRecord.countDocuments(getTranslationQuery());
         res.json({ pendingCount: count, translationState });
     } catch (error) {
-        console.error("❌ Translation Count Error:", error); // <-- This will catch any DB query errors
+        console.error("❌ Translation Count Error:", error);
         res.status(500).json({ error: 'Failed to count pending translations' });
     }
 };
@@ -316,11 +343,9 @@ export const triggerTranslation = async (req, res) => {
             let errorCount = 0;
             let consecutiveChunkFailures = 0;
 
-            // Reduced from 5 to 3 to avoid instant IP bans from Google
             const CHUNK_SIZE = 3;
 
             for (let i = 0; i < totalRecords; i += CHUNK_SIZE) {
-                // Check User Kill Switch
                 if (cancelTranslationFlag) {
                     console.log("🛑 [Translation Engine] Halted by User Command.");
                     translationState.message = 'Halted by User.';
@@ -328,7 +353,7 @@ export const triggerTranslation = async (req, res) => {
                 }
 
                 const chunk = recordsToTranslate.slice(i, i + CHUNK_SIZE);
-                let chunkFailed = true; // Assume failure until one succeeds
+                let chunkFailed = true;
 
                 await Promise.all(chunk.map(async (record) => {
                     let updateData = {};
@@ -347,7 +372,6 @@ export const triggerTranslation = async (req, res) => {
                             if (record.inspect_issue_description) {
                                 const descRes = await translate(record.inspect_issue_description, { to: 'en' });
 
-                                // THE INFINITE LOOP FIX: If Google returns the exact same Chinese text, mark it as failed so it clears the queue!
                                 if (descRes.text === record.inspect_issue_description) {
                                     updateData.inspect_issue_description_en = 'Skipped - Google returned unchanged text';
                                 } else {
@@ -364,12 +388,11 @@ export const triggerTranslation = async (req, res) => {
                             }
 
                             success = true;
-                            chunkFailed = false; // At least one record succeeded!
+                            chunkFailed = false;
 
                         } catch (err) {
                             if (attempts >= 2) {
                                 errorCount++;
-                                // Print the exact error so you can see if Google is banning you
                                 console.log(`⚠️ ID ${record._id.toString().substring(0, 6)}... Failed: ${err.message}`);
 
                                 await AllRecord.updateOne(
@@ -381,7 +404,6 @@ export const triggerTranslation = async (req, res) => {
                     }
                 }));
 
-                // Auto-Kill Switch if Google blocks your VPS IP
                 if (chunkFailed) {
                     consecutiveChunkFailures++;
                 } else {
@@ -403,7 +425,6 @@ export const triggerTranslation = async (req, res) => {
                     break;
                 }
 
-                // Wait 2.5 seconds between chunks
                 await new Promise(resolve => setTimeout(resolve, 2500));
             }
 
@@ -423,7 +444,6 @@ export const triggerTranslation = async (req, res) => {
     })();
 };
 
-// --- NEW FUNCTION TO FLIP THE KILL SWITCH ---
 export const stopTranslation = (req, res) => {
     if (!translationState.isRunning) {
         return res.status(400).json({ message: "Engine is not currently running." });
@@ -436,7 +456,6 @@ export const stopTranslation = (req, res) => {
     res.json({ message: "Stop command sent. Engine will halt after the current chunk." });
 };
 
-// --- ANOMALY TRACKER FETCH (WITH DATES, PAGINATION & GRAND TOTAL) ---
 export const getAnomalies = async (req, res) => {
     try {
         const { startDate, endDate, page = 1, limit = 50 } = req.query;
@@ -448,12 +467,10 @@ export const getAnomalies = async (req, res) => {
             query.updatedAt = { $gte: start, $lte: end };
         }
 
-        // Pagination Math
         const skip = (Number(page) - 1) * Number(limit);
         const totalRecords = await AllRecord.countDocuments(query);
         const totalPages = Math.ceil(totalRecords / Number(limit));
 
-        // --- NEW: Calculate the Grand Total Hours across ALL filtered records ---
         const aggregation = await AllRecord.aggregate([
             { $match: query },
             { $group: { _id: null, totalLostSeconds: { $sum: "$locked_duration" } } }
@@ -471,7 +488,7 @@ export const getAnomalies = async (req, res) => {
             totalPages, 
             currentPage: Number(page), 
             totalRecords,
-            totalLostSeconds // <-- Pass the true grand total to the frontend
+            totalLostSeconds 
         });
 
     } catch (error) {

@@ -1,21 +1,40 @@
 import AllRecord from '../models/AllRecords.js';
+import TeamMap from '../models/TeamMap.js';
 
 export const getAttendance = async (req, res) => {
     try {
         const { startDate, endDate, page = 1, limit = 50, teams, producer } = req.query;
 
+        // Base match constraint
         let initialMatch = {
-            producer: { $exists: true, $ne: "" },
             start_produce_time: { $exists: true, $ne: null }
         };
 
-        // NEW: Accept multiple teams based on tag/shift filtering
+        let producerCondition = { $ne: "" };
+
+        // --- NEW: SMART TEAM-TO-USER FILTERING ---
         if (teams && teams !== 'ALL') {
-            const teamArray = teams.split(',');
-            initialMatch.project_category = { $in: teamArray };
+            if (teams === '___NONE___') {
+                // If filters were applied but resulted in 0 valid teams, force empty results
+                producerCondition.$in = [];
+            } else {
+                const teamArray = teams.split(',');
+                
+                // Find all users assigned to the requested teams
+                const mappings = await TeamMap.find({ teamName: { $in: teamArray } }).lean();
+                const allowedProducers = mappings.map(m => m.username);
+                
+                producerCondition.$in = allowedProducers;
+            }
         }
-        
-        if (producer) initialMatch.producer = new RegExp(producer, 'i');
+
+        // --- SEARCH BAR FILTERING ---
+        if (producer) {
+            producerCondition.$regex = new RegExp(producer, 'i');
+        }
+
+        // Apply combined producer conditions
+        initialMatch.producer = producerCondition;
 
         const pipeline = [
             { $match: initialMatch },
@@ -106,7 +125,7 @@ export const getAttendance = async (req, res) => {
             }
         });
 
-        // NEW: Sort by Highest Attendance First, then alphabetically
+        // Sort by Highest Attendance First, then alphabetically
         pipeline.push({ $sort: { presentDays: -1, producer: 1 } });
 
         const skip = (Number(page) - 1) * Number(limit);
