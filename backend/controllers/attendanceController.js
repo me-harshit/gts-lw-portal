@@ -2,14 +2,19 @@ import AllRecord from '../models/AllRecords.js';
 
 export const getAttendance = async (req, res) => {
     try {
-        const { startDate, endDate, page = 1, limit = 50, team, producer } = req.query;
+        const { startDate, endDate, page = 1, limit = 50, teams, producer } = req.query;
 
         let initialMatch = {
             producer: { $exists: true, $ne: "" },
             start_produce_time: { $exists: true, $ne: null }
         };
 
-        if (team && team !== 'ALL') initialMatch.project_category = team;
+        // NEW: Accept multiple teams based on tag/shift filtering
+        if (teams && teams !== 'ALL') {
+            const teamArray = teams.split(',');
+            initialMatch.project_category = { $in: teamArray };
+        }
+        
         if (producer) initialMatch.producer = new RegExp(producer, 'i');
 
         const pipeline = [
@@ -25,7 +30,6 @@ export const getAttendance = async (req, res) => {
                             6 * 60 * 60 * 1000
                         ]
                     },
-                    // Safely parse video_duration to a double (handles strings, nulls, and missing fields securely)
                     safe_video_duration: {
                         $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 }
                     }
@@ -55,7 +59,7 @@ export const getAttendance = async (req, res) => {
                 checkIn: { $min: "$actual_ist_time" },
                 checkOut: { $max: "$actual_ist_time" },
                 totalVideos: { $sum: 1 },
-                dailyRecordedSec: { $sum: "$safe_video_duration" } // NEW: Total video time for the day
+                dailyRecordedSec: { $sum: "$safe_video_duration" } 
             }
         });
 
@@ -74,7 +78,7 @@ export const getAttendance = async (req, res) => {
                 presentDays: { $sum: 1 },
                 totalVideos: { $sum: "$totalVideos" },
                 totalOfficeDurationSec: { $sum: "$officeDurationSec" },
-                totalRecordedSec: { $sum: "$dailyRecordedSec" }, // NEW: Grand total recorded time
+                totalRecordedSec: { $sum: "$dailyRecordedSec" }, 
                 dailyRecords: {
                     $push: {
                         date: "$_id.date",
@@ -82,7 +86,7 @@ export const getAttendance = async (req, res) => {
                         checkOut: "$checkOut",
                         totalVideos: "$totalVideos",
                         officeDurationSec: "$officeDurationSec",
-                        recordedSec: "$dailyRecordedSec" // NEW: Pass daily recorded time to overlay
+                        recordedSec: "$dailyRecordedSec" 
                     }
                 }
             }
@@ -102,7 +106,8 @@ export const getAttendance = async (req, res) => {
             }
         });
 
-        pipeline.push({ $sort: { producer: 1 } });
+        // NEW: Sort by Highest Attendance First, then alphabetically
+        pipeline.push({ $sort: { presentDays: -1, producer: 1 } });
 
         const skip = (Number(page) - 1) * Number(limit);
         const facetPipeline = [

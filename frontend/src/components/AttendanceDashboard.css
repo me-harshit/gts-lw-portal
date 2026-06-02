@@ -213,3 +213,84 @@ body.dark-mode .custom-dropdown-menu {
     z-index: 999; 
     backdrop-filter: blur(2px); 
 }
+
+
+/* Ensure the sidebar has a solid background */
+.attendance-overlay {
+    background-color: var(--bg-main, #ffffff) !important;
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.1);
+}
+
+body.dark-mode .attendance-overlay {
+    background-color: #111827 !important;
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.7);
+}
+
+/* --- CALENDAR CSS --- */
+.calendar-container {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 24px;
+}
+
+.calendar-header-row {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    text-align: center;
+    font-weight: 700;
+    font-size: 11px;
+    color: var(--text-muted);
+    padding: 8px 0;
+    text-transform: uppercase;
+}
+
+.calendar-days-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background: var(--border-color); /* Creates 1px borders between cells */
+}
+
+.calendar-cell {
+    background: var(--bg-main);
+    aspect-ratio: 1;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 14px;
+    font-weight: 600;
+    user-select: none;
+}
+
+.calendar-cell.empty {
+    background: var(--bg-secondary);
+    cursor: default;
+}
+
+.calendar-cell.present {
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.05);
+}
+
+.calendar-cell.absent {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.05);
+}
+
+.calendar-cell:hover:not(.empty) {
+    border: 2px solid var(--primary);
+}
+
+.calendar-cell.selected {
+    border: 2px solid var(--primary);
+    box-shadow: inset 0 0 0 1px var(--primary);
+    background: var(--bg-main);
+    color: var(--primary);
+}
