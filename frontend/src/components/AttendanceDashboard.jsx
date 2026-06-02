@@ -352,7 +352,6 @@ export default function AttendanceDashboard() {
                         <tr>
                             <th className="att-th">Producer</th>
                             <th className="att-th" style={{ textAlign: 'center' }}>Present Days</th>
-                            <th className="att-th" style={{ textAlign: 'center' }}>Leaves</th>
                             <th className="att-th" style={{ textAlign: 'center' }}>Total Videos</th>
                             <th className="att-th" style={{ textAlign: 'center' }}>Recorded Hours</th>
                             <th className="att-th" style={{ textAlign: 'center' }}>Office Hours</th>
@@ -361,15 +360,13 @@ export default function AttendanceDashboard() {
                     </thead>
                     <tbody>
                         {isLoading ? (
-                            <tr><td colSpan="7" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}><Loader2 className="spinning" size={24} style={{ margin: '0 auto' }} /></td></tr>
+                            <tr><td colSpan="6" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}><Loader2 className="spinning" size={24} style={{ margin: '0 auto' }} /></td></tr>
                         ) : attendance.length > 0 ? (
                             attendance.map((record) => {
-                                const leaves = Math.max(0, expectedWorkingDays - record.presentDays);
                                 return (
                                     <tr key={record.producer} style={{ borderBottom: '1px solid var(--border-color)' }}>
                                         <td style={{ padding: '16px', color: 'var(--text-main)', fontWeight: '600' }}>{record.producer}</td>
-                                        <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: '#10b981' }}>{record.presentDays} / {expectedWorkingDays}</td>
-                                        <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: leaves > 0 ? '#ef4444' : 'var(--text-muted)' }}>{leaves}</td>
+                                        <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: '#10b981' }}>{record.presentDays}</td>
                                         <td style={{ padding: '16px', textAlign: 'center', fontWeight: '600' }}>{record.totalVideos}</td>
                                         <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: 'var(--primary)' }}>{formatOfficeHours(record.totalRecordedSec)}</td>
                                         <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: 'var(--text-main)' }}>{formatOfficeHours(record.totalOfficeDurationSec)}</td>
@@ -382,7 +379,7 @@ export default function AttendanceDashboard() {
                                 )
                             })
                         ) : (
-                            <tr><td colSpan="7" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>No records found.</td></tr>
+                            <tr><td colSpan="6" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>No records found.</td></tr>
                         )}
                     </tbody>
                 </table>
