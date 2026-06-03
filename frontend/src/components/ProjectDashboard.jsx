@@ -163,18 +163,25 @@ export default function ProjectDashboard() {
         return matchesTeam && matchesSearch;
     });
 
+    // --- TIME-BASED RATE CALCULATIONS ---
     const totalCount = summary?.total?.count || 0;
     const acceptedCount = summary?.accepted?.count || 0;
     const rejectedCount = summary?.rejected?.count || 0;
     const pendingCount = summary?.pending?.count || 0;
 
-    const inspectedCount = acceptedCount + rejectedCount;
-    const inspectedHours = (summary?.accepted?.hours || 0) + (summary?.rejected?.hours || 0);
+    const totalHours = summary?.total?.hours || 0;
+    const acceptedHours = summary?.accepted?.hours || 0;
+    const rejectedHours = summary?.rejected?.hours || 0;
+    const pendingHours = summary?.pending?.hours || 0;
 
-    const acceptanceRate = inspectedCount > 0 ? ((acceptedCount / inspectedCount) * 100).toFixed(2) : '0.00';
-    const rejectionRate = inspectedCount > 0 ? ((rejectedCount / inspectedCount) * 100).toFixed(2) : '0.00';
-    const pendingRate = totalCount > 0 ? ((pendingCount / totalCount) * 100).toFixed(2) : '0.00';
-    const inspectedRate = totalCount > 0 ? ((inspectedCount / totalCount) * 100).toFixed(2) : '0.00';
+    const inspectedCount = acceptedCount + rejectedCount;
+    const inspectedHours = acceptedHours + rejectedHours;
+
+    // Fixed Rates: Using duration strictly instead of counts
+    const acceptanceRate = inspectedHours > 0 ? ((acceptedHours / inspectedHours) * 100).toFixed(2) : '0.00';
+    const rejectionRate = inspectedHours > 0 ? ((rejectedHours / inspectedHours) * 100).toFixed(2) : '0.00';
+    const pendingRate = totalHours > 0 ? ((pendingHours / totalHours) * 100).toFixed(2) : '0.00';
+    const inspectedRate = totalHours > 0 ? ((inspectedHours / totalHours) * 100).toFixed(2) : '0.00';
 
     return (
         <div className="dashboard-card">
@@ -228,14 +235,14 @@ export default function ProjectDashboard() {
                 <div className="summary-card">
                     <span className="card-title">Total Volume</span>
                     <div style={{ display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
-                        <span className="card-value" style={{ color: 'var(--primary)', lineHeight: '1' }}>{formatDecimalHours(summary?.total?.hours)}</span>
+                        <span className="card-value" style={{ color: 'var(--primary)', lineHeight: '1' }}>{formatDecimalHours(totalHours)}</span>
                         <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>{totalCount.toLocaleString()} videos</span>
                     </div>
                 </div>
                 <div className="summary-card">
                     <span className="card-title">Total Accepted</span>
                     <div style={{ display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
-                        <span className="card-value" style={{ color: '#10b981', lineHeight: '1' }}>{formatDecimalHours(summary?.accepted?.hours)}</span>
+                        <span className="card-value" style={{ color: '#10b981', lineHeight: '1' }}>{formatDecimalHours(acceptedHours)}</span>
                         <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>{acceptedCount.toLocaleString()} videos</span>
                         {inspectedCount > 0 && <span style={{ fontSize: '13px', color: 'var(--text-main)', marginTop: '2px', fontWeight: '600' }}>Acceptance Rate - {acceptanceRate}%</span>}
                     </div>
@@ -243,7 +250,7 @@ export default function ProjectDashboard() {
                 <div className="summary-card">
                     <span className="card-title">Total Rejected</span>
                     <div style={{ display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
-                        <span className="card-value" style={{ color: '#ef4444', lineHeight: '1' }}>{formatDecimalHours(summary?.rejected?.hours)}</span>
+                        <span className="card-value" style={{ color: '#ef4444', lineHeight: '1' }}>{formatDecimalHours(rejectedHours)}</span>
                         <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>{rejectedCount.toLocaleString()} videos</span>
                         {inspectedCount > 0 && <span style={{ fontSize: '13px', color: 'var(--text-main)', marginTop: '2px', fontWeight: '600' }}>Rejection Rate - {rejectionRate}%</span>}
                     </div>
@@ -259,7 +266,7 @@ export default function ProjectDashboard() {
                 <div className="summary-card">
                     <span className="card-title">Pending QC</span>
                     <div style={{ display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
-                        <span className="card-value" style={{ color: '#f59e0b', lineHeight: '1' }}>{formatDecimalHours(summary?.pending?.hours)}</span>
+                        <span className="card-value" style={{ color: '#f59e0b', lineHeight: '1' }}>{formatDecimalHours(pendingHours)}</span>
                         <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>{pendingCount.toLocaleString()} videos</span>
                         {totalCount > 0 && <span style={{ fontSize: '13px', color: 'var(--text-main)', marginTop: '2px', fontWeight: '600' }}>QC Pending - {pendingRate}%</span>}
                     </div>
@@ -382,9 +389,10 @@ export default function ProjectDashboard() {
                             <tbody>
                                 {producerData?.tasks?.length > 0 ? (
                                     producerData.tasks.map(task => {
-                                        const passedPct = task.totalVideos > 0 ? Math.round((task.passedVideos / task.totalVideos) * 100) : 0;
-                                        const failedPct = task.totalVideos > 0 ? Math.round((task.failedVideos / task.totalVideos) * 100) : 0;
-                                        const waitingPct = task.totalVideos > 0 ? Math.round((task.waitingVideos / task.totalVideos) * 100) : 0;
+                                        // Fixed Rates: Calculating percentages based on duration instead of counts
+                                        const passedPct = task.totalSec > 0 ? Math.round((task.passedSec / task.totalSec) * 100) : 0;
+                                        const failedPct = task.totalSec > 0 ? Math.round((task.failedSec / task.totalSec) * 100) : 0;
+                                        const waitingPct = task.totalSec > 0 ? Math.round((task.waitingSec / task.totalSec) * 100) : 0;
 
                                         return (
                                             <tr key={task._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
