@@ -1,18 +1,14 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
 import axios from 'axios';
 import { useQuery } from '@tanstack/react-query';
-import {
-    Calendar, User, Search, ChevronDown, ChevronRight, 
-    FileWarning, ShieldAlert, Users, ListFilter, AlertCircle, Video
-} from 'lucide-react';
+import { Calendar, User, Search, ChevronDown, ChevronRight, FileWarning, ShieldAlert, Users, ListFilter, AlertCircle, Video, Tag as TagIcon, Clock, Loader2 } from 'lucide-react';
 import './TaskDashboard.css';
 import './ProjectDashboard.css';
 import './QcDashboard.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-// --- CUSTOM DROPDOWN COMPONENT ---
-const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder }) => {
+const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder, containerStyle }) => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
 
@@ -27,13 +23,15 @@ const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder }) => 
     const selectedLabel = options.find(o => o.value === value)?.label || placeholder;
 
     return (
-        <div className="custom-dropdown-container" style={{ width: 'auto', minWidth: '160px' }} ref={dropdownRef}>
-            <div className="custom-dropdown-header" onClick={() => setIsOpen(!isOpen)}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {Icon && <Icon size={16} color="var(--text-muted)" />}
-                    <span>{selectedLabel}</span>
+        <div className="custom-dropdown-container" style={containerStyle || { width: '200px' }} ref={dropdownRef}>
+            <div className="custom-dropdown-header" onClick={() => setIsOpen(!isOpen)} style={{ height: '100%', width: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
+                    {Icon && <Icon size={16} color="var(--text-muted)" style={{ flexShrink: 0 }} />}
+                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', width: '100%' }}>
+                        {selectedLabel}
+                    </span>
                 </div>
-                <ChevronDown size={16} color="var(--text-muted)" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }} />
+                <ChevronDown size={16} color="var(--text-muted)" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s', flexShrink: 0 }} />
             </div>
             {isOpen && (
                 <div className="custom-dropdown-menu">
@@ -55,65 +53,52 @@ const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder }) => 
 };
 
 export default function QcDashboard() {
-    // Mode State
     const [viewMode, setViewMode] = useState('BY_PRODUCER'); 
 
     // Filters
-    const [teamCategory, setTeamCategory] = useState('ALL');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [activeFilter, setActiveFilter] = useState('allTime');
     
-    // Selections
+    const [activeTag, setActiveTag] = useState('ALL');
+    const [activeShift, setActiveShift] = useState('ALL');
+    const [teamCategory, setTeamCategory] = useState('ALL');
+
+    // Metadata
+    const [tags, setTags] = useState([]);
+    const [shifts, setShifts] = useState([]);
     const [teams, setTeams] = useState([]);
-    const [producers, setProducers] = useState([]);
+    const [teamConfigs, setTeamConfigs] = useState([]);
+    const [userMappings, setUserMappings] = useState([]);
     
-    // Producer Dropdown State
+    // Dropdowns
     const [selectedProducer, setSelectedProducer] = useState(null);
     const [isProducerOpen, setIsProducerOpen] = useState(false);
     const [producerSearch, setProducerSearch] = useState('');
     const producerRef = useRef(null);
 
-    // Reason Dropdown State
     const [selectedReason, setSelectedReason] = useState(null);
     const [isReasonOpen, setIsReasonOpen] = useState(false);
     const [reasonSearch, setReasonSearch] = useState('');
     const reasonRef = useRef(null);
 
-    // Nested Accordion State
+    // Accordions
     const [expandedTops, setExpandedTops] = useState(new Set());
     const [expandedTasks, setExpandedTasks] = useState(new Set());
 
     const applyQuickFilter = (type) => {
         setActiveFilter(type);
         const today = new Date();
-        const formatDate = (date) => {
-            const yyyy = date.getFullYear();
-            const mm = String(date.getMonth() + 1).padStart(2, '0');
-            const dd = String(date.getDate()).padStart(2, '0');
-            return `${yyyy}-${mm}-${dd}`;
-        };
+        const formatDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
-        if (type === 'today') {
-            setStartDate(formatDate(today)); setEndDate(formatDate(today));
-        } else if (type === 'yesterday') {
-            const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
-            setStartDate(formatDate(yesterday)); setEndDate(formatDate(yesterday));
-        } else if (type === 'thisWeek') {
-            const monday = new Date(today); const day = monday.getDay() || 7; 
-            monday.setDate(monday.getDate() - (day - 1));
-            setStartDate(formatDate(monday)); setEndDate(formatDate(today));
-        } else if (type === 'thisMonth') {
-            const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-            setStartDate(formatDate(firstDay)); setEndDate(formatDate(today));
-        } else if (type === 'allTime') {
-            setStartDate(''); setEndDate('');
-        }
+        if (type === 'today') { setStartDate(formatDate(today)); setEndDate(formatDate(today)); } 
+        else if (type === 'yesterday') { const y = new Date(today); y.setDate(y.getDate() - 1); setStartDate(formatDate(y)); setEndDate(formatDate(y)); } 
+        else if (type === 'thisWeek') { const m = new Date(today); m.setDate(m.getDate() - (m.getDay() || 7) + 1); setStartDate(formatDate(m)); setEndDate(formatDate(today)); } 
+        else if (type === 'thisMonth') { setStartDate(formatDate(new Date(today.getFullYear(), today.getMonth(), 1))); setEndDate(formatDate(today)); } 
+        else { setStartDate(''); setEndDate(''); }
     };
 
-    const handleDateChange = (setter, value) => {
-        setActiveFilter(''); setter(value);
-    };
+    const handleDateChange = (setter, value) => { setActiveFilter(''); setter(value); };
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -125,40 +110,63 @@ export default function QcDashboard() {
     }, []);
 
     useEffect(() => {
-        const fetchMeta = async () => {
+        const fetchMetadata = async () => {
             try {
-                const res = await axios.get(`${API_URL}/api/teams`);
-                const mappings = res.data;
-                const uniqueTeams = new Set(mappings.map(m => m.teamName));
-                setTeams(Array.from(uniqueTeams));
-                setProducers(mappings);
-            } catch (error) {
-                console.error("Failed to load meta data", error);
-            }
+                const [configsRes, tagsRes, shiftsRes, mapsRes] = await Promise.all([
+                    axios.get(`${API_URL}/api/teams/configs`),
+                    axios.get(`${API_URL}/api/teams/tags`),
+                    axios.get(`${API_URL}/api/teams/shifts`),
+                    axios.get(`${API_URL}/api/teams`)
+                ]);
+                
+                setTeamConfigs(configsRes.data);
+                setTags(tagsRes.data.map(t => t.name));
+                setShifts(shiftsRes.data.map(s => s.name));
+                setUserMappings(mapsRes.data);
+                setTeams(Array.from(new Set(configsRes.data.map(c => c.name))));
+            } catch (error) { console.error("Failed to load metadata", error); }
         };
-        fetchMeta();
+        fetchMetadata();
     }, []);
 
-    // --- FETCH QC DETAILS ---
+    let matchingTeams = teamConfigs;
+    if (activeTag !== 'ALL') matchingTeams = matchingTeams.filter(t => t.tag === activeTag);
+    if (activeShift !== 'ALL') matchingTeams = matchingTeams.filter(t => t.timingSlot === activeShift);
+    if (teamCategory !== 'ALL') matchingTeams = matchingTeams.filter(t => t.name === teamCategory);
+
+    let teamQuery = 'ALL';
+    if ((activeTag !== 'ALL' || activeShift !== 'ALL' || teamCategory !== 'ALL') && matchingTeams.length === 0) {
+        teamQuery = '___NONE___'; 
+    } else if (activeTag !== 'ALL' || activeShift !== 'ALL' || teamCategory !== 'ALL') {
+        teamQuery = matchingTeams.map(t => t.name).join(',');
+    }
+
     const { data: qcData, isFetching } = useQuery({
-        queryKey: ['qcDetails', startDate, endDate, teamCategory, viewMode, selectedProducer?.username, selectedReason],
+        queryKey: ['qcDetails', startDate, endDate, teamQuery, viewMode, selectedProducer?.username, selectedReason],
         queryFn: async () => {
-            let url = `${API_URL}/api/dashboard/stats/qc-details?teamName=${teamCategory}&viewMode=${viewMode}`;
+            let url = `${API_URL}/api/dashboard/stats/qc-details?teams=${teamQuery}&viewMode=${viewMode}`;
             if (startDate && endDate) url += `&startDate=${startDate}&endDate=${endDate}`;
-            
-            if (viewMode === 'BY_PRODUCER' && selectedProducer) {
-                url += `&producer=${selectedProducer.username}`;
-            } else if (viewMode === 'BY_REASON' && selectedReason) {
-                url += `&reason=${encodeURIComponent(selectedReason)}`;
-            }
+            if (viewMode === 'BY_PRODUCER' && selectedProducer) url += `&producer=${selectedProducer.username}`;
+            else if (viewMode === 'BY_REASON' && selectedReason) url += `&reason=${encodeURIComponent(selectedReason)}`;
             
             const res = await axios.get(url);
             return res.data;
         },
-        refetchOnWindowFocus: false
+        refetchOnWindowFocus: false,
+        enabled: teamConfigs.length > 0
     });
 
-    const filteredProducers = producers.filter(p => {
+    // 关联制作人与其对应的团队与标签信息
+    const enrichedProducers = userMappings.map(p => {
+        const config = teamConfigs.find(c => c.name === p.teamName);
+        return { 
+            ...p, 
+            tag: config ? config.tag : 'N/A',
+            shift: config ? config.timingSlot : 'N/A'
+        };
+    });
+
+    const filteredProducers = enrichedProducers.filter(p => {
         const matchesTeam = teamCategory === 'ALL' || p.teamName === teamCategory;
         const matchesSearch = p.username.toLowerCase().includes(producerSearch.toLowerCase());
         return matchesTeam && matchesSearch;
@@ -186,15 +194,13 @@ export default function QcDashboard() {
 
     return (
         <div className="dashboard-card" style={{ maxWidth: '1400px', margin: '0 auto' }}>
-            
-            {/* TOP BAR & FILTERS */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <h2 className="dashboard-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                        <ShieldAlert color="var(--primary)" size={24} />
-                        Quality Control Hub
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '24px' }}>
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                    <h2 className="dashboard-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'var(--primary)' }}>
+                        <ShieldAlert size={28} /> QC Analysis Hub
                     </h2>
-                    <div className="quick-filters-container">
+                    <div className="quick-filters-container" style={{ margin: 0 }}>
                         <button className={`quick-filter-btn ${activeFilter === 'allTime' ? 'active' : ''}`} onClick={() => applyQuickFilter('allTime')}>All Time</button>
                         <button className={`quick-filter-btn ${activeFilter === 'today' ? 'active' : ''}`} onClick={() => applyQuickFilter('today')}>Today</button>
                         <button className={`quick-filter-btn ${activeFilter === 'yesterday' ? 'active' : ''}`} onClick={() => applyQuickFilter('yesterday')}>Yesterday</button>
@@ -203,102 +209,122 @@ export default function QcDashboard() {
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                    <div className="qc-filter-wrapper">
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end' }}>
+                    <CustomSelect 
+                        icon={TagIcon} 
+                        value={activeTag} 
+                        onChange={setActiveTag} 
+                        options={[{ value: 'ALL', label: 'All Tags' }, ...tags.map(t => ({ value: t, label: t }))]} 
+                        containerStyle={{ width: '160px', height: '40px' }} 
+                    />
+                    <CustomSelect 
+                        icon={Clock} 
+                        value={activeShift} 
+                        onChange={setActiveShift} 
+                        options={[{ value: 'ALL', label: 'All Shifts' }, ...shifts.map(s => ({ value: s, label: s }))]} 
+                        containerStyle={{ width: '180px', height: '40px' }} 
+                    />
+                    <CustomSelect 
+                        icon={Users} 
+                        value={teamCategory} 
+                        onChange={setTeamCategory} 
+                        options={[{ value: 'ALL', label: 'All Teams' }, ...teams.map(t => ({ value: t, label: t }))]} 
+                        containerStyle={{ width: '160px', height: '40px' }} 
+                    />
+                    <div className="qc-filter-wrapper" style={{ height: '40px' }}>
                         <Calendar size={16} color="var(--text-muted)" />
-                        <input type="date" value={startDate} onChange={(e) => handleDateChange(setStartDate, e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none', paddingLeft: '8px' }} />
-                        <span style={{ color: 'var(--text-muted)', margin: '0 8px' }}>to</span>
+                        <input type="date" value={startDate} onChange={(e) => handleDateChange(setStartDate, e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none' }} />
+                        <span style={{ color: 'var(--text-muted)' }}>to</span>
                         <input type="date" value={endDate} onChange={(e) => handleDateChange(setEndDate, e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none' }} />
                     </div>
+                </div>
 
-                    <CustomSelect 
-                        icon={Users}
-                        value={teamCategory}
-                        onChange={setTeamCategory}
-                        options={[{ value: 'ALL', label: 'All Teams' }, ...teams.map(t => ({ value: t, label: t }))]}
-                    />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-secondary)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', flexWrap: 'wrap', gap: '16px' }}>
+                    <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-main)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                        <button 
+                            onClick={() => { setViewMode('BY_PRODUCER'); setSelectedReason(null); }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px', background: viewMode === 'BY_PRODUCER' ? 'var(--primary)' : 'transparent', color: viewMode === 'BY_PRODUCER' ? '#fff' : 'var(--text-muted)', transition: 'all 0.2s' }}
+                        >
+                            <User size={14} /> By Reason
+                        </button>
+                        <button 
+                            onClick={() => { setViewMode('BY_REASON'); setSelectedProducer(null); }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px', background: viewMode === 'BY_REASON' ? 'var(--primary)' : 'transparent', color: viewMode === 'BY_REASON' ? '#fff' : 'var(--text-muted)', transition: 'all 0.2s' }}
+                        >
+                            <ListFilter size={14} /> By Producer
+                        </button>
+                    </div>
+
+                    {viewMode === 'BY_PRODUCER' ? (
+                        <div className="custom-dropdown-container" ref={producerRef} style={{ width: '100%', maxWidth: '350px' }}>
+                            <div className="custom-dropdown-header" onClick={() => setIsProducerOpen(!isProducerOpen)} style={{ background: 'var(--bg-main)', height: '40px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                                    <User size={16} color="var(--text-muted)" style={{ flexShrink: 0 }} />
+                                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {selectedProducer ? selectedProducer.username : '-- Search Specific Producer --'}
+                                    </span>
+                                </div>
+                                <ChevronDown size={16} color="var(--text-muted)" />
+                            </div>
+                            {isProducerOpen && (
+                                <div className="custom-dropdown-menu">
+                                    <div className="custom-dropdown-search">
+                                        <Search size={14} className="custom-dropdown-search-icon" />
+                                        <input type="text" placeholder="Search producers..." value={producerSearch} onChange={(e) => setProducerSearch(e.target.value)} autoFocus />
+                                    </div>
+                                    <ul className="custom-dropdown-list">
+                                        <li className={`custom-dropdown-item ${!selectedProducer ? 'active' : ''}`} onClick={() => { setSelectedProducer(null); setIsProducerOpen(false); setProducerSearch(''); }}>
+                                            -- All Producers --
+                                        </li>
+                                        {filteredProducers.map(p => (
+                                            <li key={p.username} className={`custom-dropdown-item ${selectedProducer?.username === p.username ? 'active' : ''}`} onClick={() => { setSelectedProducer(p); setIsProducerOpen(false); setProducerSearch(''); }}>
+                                                <div style={{ fontWeight: '600' }}>{p.username}</div>
+                                                <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
+                                                    <span style={{ fontSize: '10px', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: '4px', color: 'var(--text-muted)' }}>{p.teamName}</span>
+                                                    {p.tag !== 'N/A' && <span style={{ fontSize: '10px', background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)', padding: '2px 6px', borderRadius: '4px', color: '#8b5cf6', display: 'flex', alignItems: 'center', gap: '3px' }}><TagIcon size={10} /> {p.tag}</span>}
+                                                    {p.shift !== 'N/A' && <span style={{ fontSize: '10px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '2px 6px', borderRadius: '4px', color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '3px' }}><Clock size={10} /> {p.shift}</span>}
+                                                </div>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="custom-dropdown-container" ref={reasonRef} style={{ width: '100%', maxWidth: '400px' }}>
+                            <div className="custom-dropdown-header" onClick={() => setIsReasonOpen(!isReasonOpen)} style={{ background: 'var(--bg-main)', height: '40px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                                    <FileWarning size={16} color="var(--text-muted)" style={{ flexShrink: 0 }}/>
+                                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {selectedReason ? selectedReason : '-- Filter by Specific Reason --'}
+                                    </span>
+                                </div>
+                                <ChevronDown size={16} color="var(--text-muted)" />
+                            </div>
+                            {isReasonOpen && (
+                                <div className="custom-dropdown-menu">
+                                    <div className="custom-dropdown-search">
+                                        <Search size={14} className="custom-dropdown-search-icon" />
+                                        <input type="text" placeholder="Search reasons..." value={reasonSearch} onChange={(e) => setReasonSearch(e.target.value)} autoFocus />
+                                    </div>
+                                    <ul className="custom-dropdown-list">
+                                        <li className={`custom-dropdown-item ${!selectedReason ? 'active' : ''}`} onClick={() => { setSelectedReason(null); setIsReasonOpen(false); setReasonSearch(''); }}>
+                                            -- All Rejection Reasons --
+                                        </li>
+                                        {filteredReasons.map(r => (
+                                            <li key={r} className={`custom-dropdown-item ${selectedReason === r ? 'active' : ''}`} onClick={() => { setSelectedReason(r); setIsReasonOpen(false); setReasonSearch(''); }}>
+                                                {r}
+                                            </li>
+                                        ))}
+                                        {filteredReasons.length === 0 && <li style={{ padding: '10px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>No reasons found.</li>}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 
-            {/* VIEW MODE TOGGLE & DYNAMIC SEARCH DROPDOWNS */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-secondary)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
-                
-                <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-main)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                    <button 
-                        onClick={() => { setViewMode('BY_PRODUCER'); setSelectedReason(null); }}
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px', background: viewMode === 'BY_PRODUCER' ? 'var(--primary)' : 'transparent', color: viewMode === 'BY_PRODUCER' ? '#fff' : 'var(--text-muted)', transition: 'all 0.2s' }}
-                    >
-                        <User size={14} /> By Reason
-                    </button>
-                    <button 
-                        onClick={() => { setViewMode('BY_REASON'); setSelectedProducer(null); }}
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px', background: viewMode === 'BY_REASON' ? 'var(--primary)' : 'transparent', color: viewMode === 'BY_REASON' ? '#fff' : 'var(--text-muted)', transition: 'all 0.2s' }}
-                    >
-                        <ListFilter size={14} /> By Producer
-                    </button>
-                </div>
-
-                {viewMode === 'BY_PRODUCER' ? (
-                    <div className="custom-dropdown-container" ref={producerRef}>
-                        <div className="custom-dropdown-header" onClick={() => setIsProducerOpen(!isProducerOpen)} style={{ background: 'var(--bg-main)' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <User size={16} color="var(--text-muted)" />
-                                <span>{selectedProducer ? selectedProducer.username : '-- Global Producers --'}</span>
-                            </div>
-                            <ChevronDown size={16} color="var(--text-muted)" style={{ transform: isProducerOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }} />
-                        </div>
-                        {isProducerOpen && (
-                            <div className="custom-dropdown-menu">
-                                <div className="custom-dropdown-search">
-                                    <Search size={14} className="custom-dropdown-search-icon" />
-                                    <input type="text" placeholder="Search producers..." value={producerSearch} onChange={(e) => setProducerSearch(e.target.value)} autoFocus />
-                                </div>
-                                <ul className="custom-dropdown-list">
-                                    <li className={`custom-dropdown-item ${!selectedProducer ? 'active' : ''}`} onClick={() => { setSelectedProducer(null); setIsProducerOpen(false); setProducerSearch(''); }}>
-                                        -- Global Producers --
-                                    </li>
-                                    {filteredProducers.map(p => (
-                                        <li key={p.username} className={`custom-dropdown-item ${selectedProducer?.username === p.username ? 'active' : ''}`} onClick={() => { setSelectedProducer(p); setIsProducerOpen(false); setProducerSearch(''); }}>
-                                            {p.username} <span className="custom-dropdown-item-team">{p.teamName}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-                    </div>
-                ) : (
-                    <div className="custom-dropdown-container" ref={reasonRef}>
-                        <div className="custom-dropdown-header" onClick={() => setIsReasonOpen(!isReasonOpen)} style={{ background: 'var(--bg-main)' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <FileWarning size={16} color="var(--text-muted)" />
-                                <span>{selectedReason ? selectedReason : '-- Global Rejection Reasons --'}</span>
-                            </div>
-                            <ChevronDown size={16} color="var(--text-muted)" style={{ transform: isReasonOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }} />
-                        </div>
-                        {isReasonOpen && (
-                            <div className="custom-dropdown-menu">
-                                <div className="custom-dropdown-search">
-                                    <Search size={14} className="custom-dropdown-search-icon" />
-                                    <input type="text" placeholder="Search reasons..." value={reasonSearch} onChange={(e) => setReasonSearch(e.target.value)} autoFocus />
-                                </div>
-                                <ul className="custom-dropdown-list">
-                                    <li className={`custom-dropdown-item ${!selectedReason ? 'active' : ''}`} onClick={() => { setSelectedReason(null); setIsReasonOpen(false); setReasonSearch(''); }}>
-                                        -- Global Rejection Reasons --
-                                    </li>
-                                    {filteredReasons.map(r => (
-                                        <li key={r} className={`custom-dropdown-item ${selectedReason === r ? 'active' : ''}`} onClick={() => { setSelectedReason(r); setIsReasonOpen(false); setReasonSearch(''); }}>
-                                            {r}
-                                        </li>
-                                    ))}
-                                    {filteredReasons.length === 0 && <li style={{ padding: '10px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>No reasons found.</li>}
-                                </ul>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-
-            {/* SUMMARY CARDS */}
             <div className="summary-cards" style={{ opacity: isFetching ? 0.5 : 1, transition: 'opacity 0.2s', marginBottom: '40px' }}>
                 <div className="summary-card">
                     <span className="card-title">Total Videos</span>
@@ -322,15 +348,12 @@ export default function QcDashboard() {
                 </div>
             </div>
 
-            {/* --- TREE DATA GRID --- */}
             <h3 style={{ margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)' }}>
                 <ListFilter size={20} color="var(--primary)" />
                 {viewMode === 'BY_PRODUCER' ? 'Failure Analysis by Reason' : 'Failure Analysis by Producer'}
             </h3>
 
             <div className="qc-tree-container" style={{ opacity: isFetching ? 0.6 : 1, transition: 'opacity 0.2s' }}>
-                
-                {/* Master Header */}
                 <div className="qc-tree-header">
                     <div style={{ flex: 1, paddingLeft: '8px' }}>{viewMode === 'BY_PRODUCER' ? 'Rejection Reason' : 'Producer Name'}</div>
                     <div style={{ width: '150px', textAlign: 'right', paddingRight: '8px' }}>Failure Count</div>
@@ -338,7 +361,7 @@ export default function QcDashboard() {
 
                 {rejectionTree.length === 0 ? (
                     <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                        {isFetching ? 'Crunching the data...' : '🎉 No rejections found for this criteria!'}
+                        {isFetching ? <Loader2 className="spinning" style={{ margin: '0 auto' }} /> : '🎉 No rejections found for this criteria!'}
                     </div>
                 ) : (
                     rejectionTree.map((node, idx) => {
@@ -346,12 +369,7 @@ export default function QcDashboard() {
                         
                         return (
                             <Fragment key={`top-${idx}`}>
-                                {/* LEVEL 1 */}
-                                <div 
-                                    className="qc-tree-row level-1" 
-                                    onClick={() => toggleTopLevel(node.title)}
-                                    style={{ borderBottom: isExpanded ? '1px solid var(--border-color)' : '1px solid var(--border-color)' }}
-                                >
+                                <div className="qc-tree-row level-1" onClick={() => toggleTopLevel(node.title)} style={{ borderBottom: '1px solid var(--border-color)' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                         <button className="expand-btn" style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)' }}>
                                             {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
@@ -367,7 +385,6 @@ export default function QcDashboard() {
                                     </div>
                                 </div>
 
-                                {/* LEVEL 2: TASKS */}
                                 {isExpanded && (
                                     <div className="qc-tree-children">
                                         {node.tasks.map((taskNode, tIdx) => {
@@ -376,10 +393,7 @@ export default function QcDashboard() {
 
                                             return (
                                                 <Fragment key={`task-${tIdx}`}>
-                                                    <div 
-                                                        className="qc-tree-row level-2"
-                                                        onClick={() => toggleTask(taskKey)}
-                                                    >
+                                                    <div className="qc-tree-row level-2" onClick={() => toggleTask(taskKey)}>
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                                             <button className="expand-btn" style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)' }}>
                                                                 {isTaskExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
@@ -393,13 +407,12 @@ export default function QcDashboard() {
                                                         </div>
                                                     </div>
 
-                                                    {/* LEVEL 3: VIDEOS & FEEDBACK TABLE */}
                                                     {isTaskExpanded && (
                                                         <div className="qc-tree-details">
                                                             <table className="qc-inner-table">
                                                                 <thead>
                                                                     <tr>
-                                                                        <th style={{ width: '35%' }}>Video ID / Data Name</th>
+                                                                        <th style={{ width: '40%' }}>Video Details</th>
                                                                         <th>Inspector Feedback</th>
                                                                     </tr>
                                                                 </thead>
@@ -411,12 +424,24 @@ export default function QcDashboard() {
                                                                                     <Video size={14} />
                                                                                     {vid.dataName}
                                                                                 </div>
+                                                                                {viewMode === 'BY_PRODUCER' && (
+                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px', marginLeft: '20px' }}>
+                                                                                        <User size={10} /> By: {vid.producer}
+                                                                                    </div>
+                                                                                )}
                                                                             </td>
                                                                             <td style={{ color: 'var(--text-main)', lineHeight: '1.5' }}>
                                                                                 {vid.description}
                                                                             </td>
                                                                         </tr>
                                                                     ))}
+                                                                    {taskNode.failCount > 50 && (
+                                                                        <tr>
+                                                                            <td colSpan="2" style={{ textAlign: 'center', padding: '10px', fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                                                                Displaying the first 50 results to maintain system performance.
+                                                                            </td>
+                                                                        </tr>
+                                                                    )}
                                                                 </tbody>
                                                             </table>
                                                         </div>
@@ -431,7 +456,6 @@ export default function QcDashboard() {
                     })
                 )}
             </div>
-
         </div>
     );
 }

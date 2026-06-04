@@ -166,36 +166,33 @@ export const getProducerHistory = async (req, res) => {
 };
 
 
-// --- NEW FUNCTION: Get QC Dashboard Details (Global or Producer Specific) ---
 export const getQcDetails = async (req, res) => {
-    const { startDate, endDate, producer, teamName, viewMode = 'BY_PRODUCER', reason } = req.query;
+    const { startDate, endDate, teams, viewMode = 'BY_PRODUCER', producer, reason } = req.query;
 
     try {
-        const baseMatch = {};
+        let initialMatch = { start_produce_time: { $exists: true, $ne: null } };
 
-        // 1. Date Filters
+        // 1. Smart Team Filter via TeamMap
+        if (teams && teams !== 'ALL') {
+            if (teams === '___NONE___') {
+                initialMatch.producer = { $in: [] }; 
+            } else {
+                const teamArray = teams.split(',');
+                const mappings = await TeamMap.find({ teamName: { $in: teamArray } }).lean();
+                initialMatch.producer = { $in: mappings.map(m => m.username) };
+            }
+        }
+
+        // 2. Date Filters (Restored your exact logic)
         if (startDate && endDate) {
-            baseMatch.start_produce_time = {
+            initialMatch.start_produce_time = {
                 $gte: new Date(`${startDate}T00:00:00.000Z`),
                 $lte: new Date(`${endDate}T23:59:59.999Z`)
             };
         }
 
-        // 2. Team Filter 
-        if (teamName && teamName !== 'ALL') {
-            const teamMembers = await TeamMap.find({ teamName });
-            const targetProducers = teamMembers.map(member => member.username);
-            
-            if (targetProducers.length === 0) {
-                return res.json({ stats: null, rejectionTree: [], dynamicReasons: [] });
-            }
-            baseMatch.producer = { $in: targetProducers };
-        }
-
         // --- CHUNK A: SUMMARY STATS ---
-        const statsMatch = { ...baseMatch };
-        // We only filter stats by producer if we are in Producer View. 
-        // If in Reason View, we show the global team stats for context.
+        const statsMatch = { ...initialMatch };
         if (viewMode === 'BY_PRODUCER' && producer && producer !== 'ALL') {
             statsMatch.producer = producer;
         }
@@ -224,20 +221,19 @@ export const getQcDetails = async (req, res) => {
         ]);
 
         // --- CHUNK B: NESTED REJECTION TREE ---
-        const treeMatch = { ...baseMatch, inspect_result: 'INSPECT_FAILED' };
+        const treeMatch = { ...initialMatch, inspect_result: 'INSPECT_FAILED' };
         
-        // Apply the specific switch filter
         if (viewMode === 'BY_PRODUCER' && producer && producer !== 'ALL') {
             treeMatch.producer = producer;
         } else if (viewMode === 'BY_REASON' && reason && reason !== 'ALL') {
-            treeMatch.inspect_error_type_en = reason;
+            treeMatch.inspect_error_type_en = reason; // Restored your exact match logic
         }
 
-        // THE PIVOT: Change what the top-level accordion represents
         const groupByField = viewMode === 'BY_PRODUCER' ? "$reason" : "$producer";
 
         const treePromise = AllRecord.aggregate([
             { $match: treeMatch },
+            // RESTORED: Fetch English Task Names from DB
             {
                 $lookup: {
                     from: "tasks",
@@ -250,30 +246,40 @@ export const getQcDetails = async (req, res) => {
             {
                 $addFields: {
                     cleanTaskName: { $ifNull: ["$taskDetails.taskName", "$task_name", "Unknown Task"] },
-                    reason: { $ifNull: ["$inspect_error_type_en", "Unspecified Reason"] },
-                    description: { $ifNull: ["$inspect_issue_description_en", "$inspect_issue_description", "No description provided."] },
-                    cleanDataName: { $ifNull: ["$data_name_en", "$data_name"] }
+                    reason: { $ifNull: ["$inspect_error_type_en", "Unspecified Reason"] }, // Reason name
+                    description: { $ifNull: ["$inspect_issue_description_en", "$inspect_issue_description", "No description provided."] }, // Translated sentence
+                    cleanDataName: "$data_name" // Original Video ID
                 }
             },
             {
                 $group: {
                     _id: { topLevel: groupByField, taskName: "$cleanTaskName" },
+                    taskFailCount: { $sum: 1 },
                     videos: {
                         $push: {
                             dataName: "$cleanDataName", 
-                            description: "$description"
+                            description: "$description",
+                            producer: "$producer"
                         }
-                    },
-                    taskFailCount: { $sum: 1 }
+                    }
+                }
+            },
+            // OPTIMIZATION: Max 50 videos per task to prevent UI freezing
+            {
+                $project: {
+                    topLevel: "$_id.topLevel",
+                    taskName: "$_id.taskName",
+                    taskFailCount: 1,
+                    videos: { $slice: ["$videos", 50] } 
                 }
             },
             {
                 $group: {
-                    _id: "$_id.topLevel",
+                    _id: "$topLevel",
                     totalFailures: { $sum: "$taskFailCount" },
                     tasks: {
                         $push: {
-                            taskName: "$_id.taskName",
+                            taskName: "$taskName",
                             failCount: "$taskFailCount",
                             videos: "$videos"
                         }
@@ -283,7 +289,7 @@ export const getQcDetails = async (req, res) => {
             { $sort: { totalFailures: -1 } },
             {
                 $project: {
-                    title: "$_id", // Will act as either Reason Name OR Producer Name
+                    title: { $ifNull: ["$_id", "Unknown"] },
                     _id: 0,
                     totalFailures: 1,
                     tasks: 1
@@ -293,7 +299,7 @@ export const getQcDetails = async (req, res) => {
 
         // --- CHUNK C: DYNAMIC EXTRACTION OF REASONS ---
         const reasonsPromise = AllRecord.distinct("inspect_error_type_en", {
-            ...baseMatch,
+            ...initialMatch,
             inspect_result: 'INSPECT_FAILED'
         });
 
@@ -304,7 +310,6 @@ export const getQcDetails = async (req, res) => {
             totalVideos: 0, qcDone: 0, accepted: 0, rejected: 0, waiting: 0
         };
 
-        // Filter out any null/empty reasons and sort alphabetically
         const dynamicReasons = rawReasons.filter(r => r).sort();
 
         res.json({
