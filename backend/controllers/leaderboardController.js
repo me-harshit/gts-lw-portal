@@ -2,153 +2,173 @@ import AllRecord from '../models/AllRecords.js';
 import TeamMap from '../models/TeamMap.js';
 
 export const getAcceptanceLeaderboard = async (req, res) => {
-    const { startDate, endDate, teamName, projectCategory } = req.query;
-
     try {
-        let targetProducers = null;
-        if (teamName && teamName !== 'ALL') {
-            const teamMembers = await TeamMap.find({ teamName });
-            targetProducers = teamMembers.map(member => member.username);
+        const { startDate, endDate, teams } = req.query;
 
-            if (targetProducers.length === 0) {
-                return res.json([]);
+        let initialMatch = {
+            producer: { $exists: true, $ne: "" },
+            inspect_result: { $exists: true }
+        };
+
+        // --- NEW SMART FILTERING ---
+        // Convert the requested custom Teams into a list of exact Producer usernames
+        if (teams && teams !== 'ALL') {
+            if (teams === '___NONE___') {
+                initialMatch.producer = { $in: [] };
+            } else {
+                const teamArray = teams.split(',');
+                const mappings = await TeamMap.find({ teamName: { $in: teamArray } }).lean();
+                const allowedProducers = mappings.map(m => m.username);
+                initialMatch.producer = { $in: allowedProducers };
             }
         }
 
-        const matchFilter = {};
+        const pipeline = [{ $match: initialMatch }];
 
-        if (targetProducers) {
-            matchFilter.producer = { $in: targetProducers };
-        }
-
+        // TIMEZONE MATH & DATE FILTERING
         if (startDate && endDate) {
-            matchFilter.start_produce_time = {
-                $gte: new Date(`${startDate}T00:00:00.000Z`),
-                $lte: new Date(`${endDate}T23:59:59.999Z`)
-            };
+            pipeline.push({
+                $addFields: {
+                    logical_day_time: {
+                        $subtract: [
+                            { $subtract: ["$start_produce_time", 2.5 * 60 * 60 * 1000] },
+                            6 * 60 * 60 * 1000
+                        ]
+                    }
+                }
+            });
+            pipeline.push({
+                $addFields: {
+                    working_date: { $dateToString: { format: "%Y-%m-%d", date: "$logical_day_time" } }
+                }
+            });
+            pipeline.push({
+                $match: { working_date: { $gte: startDate, $lte: endDate } }
+            });
         }
 
-        if (projectCategory && projectCategory !== 'ALL') {
-            matchFilter.project_category = projectCategory;
-        }
-
-        const leaderboardData = await AllRecord.aggregate([
-            { $match: matchFilter },
-            {
-                $group: {
-                    _id: "$producer",
-                    acceptedSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_PASSED"] }, { $toDouble: "$video_duration" }, 0] } },
-                    waitingSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_WAITING"] }, { $toDouble: "$video_duration" }, 0] } },
-                    rejectedSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_FAILED"] }, { $toDouble: "$video_duration" }, 0] } }
-                }
-            },
-            {
-                $project: {
-                    producer: "$_id",
-                    _id: 0,
-                    acceptedSec: 1,
-                    waitingSec: 1,
-                    rejectedSec: 1,
-                    totalSec: { $add: ["$acceptedSec", "$waitingSec", "$rejectedSec"] }
-                }
-            },
-            { $sort: { acceptedSec: -1 } }
-        ]);
-
-        const latestRecord = await AllRecord.findOne().sort({ start_produce_time: -1 }).select('start_produce_time');
-        const lastUpdated = latestRecord ? latestRecord.start_produce_time : null;
-
-        res.json({
-            data: leaderboardData,
-            lastUpdated: lastUpdated
+        pipeline.push({
+            $addFields: {
+                safe_video_duration: { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } }
+            }
         });
+
+        // AGGREGATE BY PRODUCER
+        pipeline.push({
+            $group: {
+                _id: "$producer",
+                acceptedSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_PASSED"] }, "$safe_video_duration", 0] } },
+                rejectedSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_FAILED"] }, "$safe_video_duration", 0] } },
+                waitingSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_WAITING"] }, "$safe_video_duration", 0] } }
+            }
+        });
+
+        pipeline.push({
+            $project: {
+                _id: 0,
+                producer: "$_id",
+                acceptedSec: 1,
+                rejectedSec: 1,
+                waitingSec: 1
+            }
+        });
+
+        // Sort by highest accepted time
+        pipeline.push({ $sort: { acceptedSec: -1 } });
+
+        const result = await AllRecord.aggregate(pipeline);
+        res.json(result);
 
     } catch (error) {
         console.error("Leaderboard Error:", error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: "Failed to fetch leaderboard" });
     }
 };
 
 export const getPerformanceLeaderboard = async (req, res) => {
-    const { startDate, endDate, teamName, projectCategory } = req.query;
-
     try {
-        let targetProducers = null;
-        if (teamName && teamName !== 'ALL') {
-            const teamMembers = await TeamMap.find({ teamName });
-            targetProducers = teamMembers.map(member => member.username);
+        const { startDate, endDate, teams } = req.query;
 
-            if (targetProducers.length === 0) return res.json([]);
+        let initialMatch = {
+            producer: { $exists: true, $ne: "" },
+            start_produce_time: { $exists: true, $ne: null }
+        };
+
+        // --- NEW SMART FILTERING ---
+        // Convert the requested custom Teams into a list of exact Producer usernames
+        if (teams && teams !== 'ALL') {
+            if (teams === '___NONE___') {
+                initialMatch.producer = { $in: [] }; 
+            } else {
+                const teamArray = teams.split(',');
+                const mappings = await TeamMap.find({ teamName: { $in: teamArray } }).lean();
+                const allowedProducers = mappings.map(m => m.username);
+                initialMatch.producer = { $in: allowedProducers };
+            }
         }
 
-        const matchFilter = {};
-        if (targetProducers) matchFilter.producer = { $in: targetProducers };
+        const pipeline = [ { $match: initialMatch } ];
 
-        let manualDays = null;
-
-        // IST BOUNDARY FIX
-        if (startDate && endDate) {
-            matchFilter.start_produce_time = {
-                $gte: new Date(`${startDate}T00:00:00.000Z`),
-                $lte: new Date(`${endDate}T23:59:59.999Z`)
-            };
-
-            const start = new Date(startDate);
-            const end = new Date(endDate);
-            manualDays = Math.max(1, Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1);
-        }
-
-        if (projectCategory && projectCategory !== 'ALL') {
-            matchFilter.project_category = projectCategory;
-        }
-
-        const leaderboardData = await AllRecord.aggregate([
-            { $match: matchFilter },
-            {
-                $group: {
-                    _id: "$producer",
-                    totalSec: { $sum: { $toDouble: "$video_duration" } },
-                    uniqueDays: {
-                        $addToSet: {
-                            $dateToString: {
-                                format: "%Y-%m-%d",
-                                date: "$start_produce_time",
-                            }
-                        }
-                    }
-                }
-            },
-            {
-                $project: {
-                    producer: "$_id",
-                    _id: 0,
-                    totalSec: 1,
-                    activeDays: { $max: [1, { $size: "$uniqueDays" }] }
-                }
-            },
-            {
-                $project: {
-                    producer: 1,
-                    totalSec: 1,
-                    dailyAverageSec: {
-                        $divide: ["$totalSec", manualDays ? manualDays : "$activeDays"]
-                    }
-                }
-            },
-            { $sort: { totalSec: -1 } }
-        ]);
-
-        const latestRecord = await AllRecord.findOne().sort({ start_produce_time: -1 }).select('start_produce_time');
-        const lastUpdated = latestRecord ? latestRecord.start_produce_time : null;
-
-        res.json({
-            data: leaderboardData,
-            lastUpdated: lastUpdated
+        // TIMEZONE MATH
+        pipeline.push({
+            $addFields: {
+                logical_day_time: {
+                    $subtract: [
+                        { $subtract: ["$start_produce_time", 2.5 * 60 * 60 * 1000] },
+                        6 * 60 * 60 * 1000
+                    ]
+                },
+                safe_video_duration: { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } }
+            }
         });
+        
+        pipeline.push({
+            $addFields: {
+                working_date: { $dateToString: { format: "%Y-%m-%d", date: "$logical_day_time" } }
+            }
+        });
+
+        // DATE FILTER
+        if (startDate && endDate) {
+            pipeline.push({
+                $match: { working_date: { $gte: startDate, $lte: endDate } }
+            });
+        }
+
+        // GROUP 1: By Producer & Date to get daily duration
+        pipeline.push({
+            $group: {
+                _id: { producer: "$producer", date: "$working_date" },
+                dailySec: { $sum: "$safe_video_duration" }
+            }
+        });
+
+        // GROUP 2: Rollup by Producer for total and average
+        pipeline.push({
+            $group: {
+                _id: "$_id.producer",
+                totalSec: { $sum: "$dailySec" },
+                daysWorked: { $sum: 1 }
+            }
+        });
+
+        pipeline.push({
+            $project: {
+                _id: 0,
+                producer: "$_id",
+                totalSec: 1,
+                dailyAverageSec: { $divide: ["$totalSec", "$daysWorked"] }
+            }
+        });
+
+        pipeline.push({ $sort: { dailyAverageSec: -1 } });
+
+        const result = await AllRecord.aggregate(pipeline);
+        res.json(result);
 
     } catch (error) {
         console.error("Performance Leaderboard Error:", error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: "Failed to fetch performance leaderboard" });
     }
 };
 

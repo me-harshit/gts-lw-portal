@@ -7,7 +7,6 @@ import './AttendanceDashboard.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-// --- FIXED CUSTOM SELECT COMPONENT ---
 const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder, containerStyle }) => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
@@ -52,7 +51,6 @@ const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder, conta
     );
 };
 
-// Generates dynamic month filters (e.g., June 2026, May 2026)
 const generateMonthFilters = () => {
     const months = [];
     const today = new Date();
@@ -76,6 +74,7 @@ export default function AttendanceDashboard() {
     const [teamConfigs, setTeamConfigs] = useState([]);
     const [tags, setTags] = useState([]);
     const [shifts, setShifts] = useState([]);
+    const [userMappings, setUserMappings] = useState([]);
 
     // Filter State
     const [startDate, setStartDate] = useState('');
@@ -104,15 +103,17 @@ export default function AttendanceDashboard() {
 
     const fetchMetadata = async () => {
         try {
-            const [configsRes, tagsRes, shiftsRes] = await Promise.all([
+            const [configsRes, tagsRes, shiftsRes, mapsRes] = await Promise.all([
                 axios.get(`${API_URL}/api/teams/configs`),
                 axios.get(`${API_URL}/api/teams/tags`),
-                axios.get(`${API_URL}/api/teams/shifts`)
+                axios.get(`${API_URL}/api/teams/shifts`),
+                axios.get(`${API_URL}/api/teams`) 
             ]);
             setTeamConfigs(configsRes.data);
             setTags(tagsRes.data.map(t => t.name));
             setShifts(shiftsRes.data.map(s => s.name));
             setTeams(Array.from(new Set(configsRes.data.map(c => c.name))));
+            setUserMappings(mapsRes.data);
         } catch (error) { console.error("Failed to load metadata", error); }
     };
 
@@ -212,7 +213,6 @@ export default function AttendanceDashboard() {
         return `${h}h ${m}m`;
     };
 
-    // --- CALENDAR RENDERER ---
     const renderCalendar = () => {
         if (!startDate) return null;
         
@@ -264,93 +264,56 @@ export default function AttendanceDashboard() {
     return (
         <div className="dashboard-card" style={{ maxWidth: '1400px', margin: '0 auto' }}>
             
-            {/* ============================== */}
-            {/* HEADER & NEW CLEAN ROW LAYOUT */}
-            {/* ============================== */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '24px' }}>
-                
-                {/* Title */}
                 <h2 className="dashboard-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'var(--primary)' }}>
                     <UserCheck size={28} /> Detailed Roster
                 </h2>
 
-                {/* ROW 1: Month Filters */}
-                <div className="quick-filters-container">
-                    {monthFilters.map(month => (
-                        <button 
-                            key={month.value.getTime()}
-                            className={`quick-filter-btn ${activeMonthFilter === month.value.getTime().toString() ? 'active' : ''}`} 
-                            onClick={() => applyMonthFilter(month.value)}
-                        >
-                            {month.label}
-                        </button>
-                    ))}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                    <div className="quick-filters-container">
+                        {monthFilters.map(month => (
+                            <button 
+                                key={month.value.getTime()}
+                                className={`quick-filter-btn ${activeMonthFilter === month.value.getTime().toString() ? 'active' : ''}`} 
+                                onClick={() => applyMonthFilter(month.value)}
+                            >
+                                {month.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    <button onClick={handleExportPDF} disabled={totalRecords === 0 || isExporting} style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: totalRecords === 0 ? 'var(--bg-secondary)' : 'var(--primary)', color: totalRecords === 0 ? 'var(--text-muted)' : 'white', border: totalRecords === 0 ? '1px solid var(--border-color)' : 'none', padding: '0 16px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: totalRecords === 0 ? 'not-allowed' : 'pointer', height: '40px' }}>
+                        <Download size={16} /> {isExporting ? 'Generating...' : 'Export PDF'}
+                    </button>
                 </div>
 
-                {/* ROW 2: All Other Filters, Search & Export grouped nicely */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-                    
-                    {/* LEFT SIDE: Dropdowns & Date Picker */}
-                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-                        <CustomSelect 
-                            icon={TagIcon} 
-                            value={activeTag} 
-                            onChange={(val) => { setActiveTag(val); setPage(1); }} 
-                            options={[{ value: 'ALL', label: 'All Tags' }, ...tags.map(t => ({ value: t, label: t }))]} 
-                            containerStyle={{ width: '160px', height: '40px' }} 
-                        />
-                        
-                        <CustomSelect 
-                            icon={Clock} 
-                            value={activeShift} 
-                            onChange={(val) => { setActiveShift(val); setPage(1); }} 
-                            options={[{ value: 'ALL', label: 'All Shifts' }, ...shifts.map(s => ({ value: s, label: s }))]} 
-                            containerStyle={{ width: '180px', height: '40px' }} 
-                        />
-                        
-                        <CustomSelect 
-                            icon={Users} 
-                            value={teamCategory} 
-                            onChange={(val) => { setTeamCategory(val); setPage(1); }} 
-                            options={[{ value: 'ALL', label: 'All Teams' }, ...teams.map(t => ({ value: t, label: t }))]} 
-                            containerStyle={{ width: '160px', height: '40px' }} 
-                        />
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <CustomSelect icon={TagIcon} value={activeTag} onChange={(val) => { setActiveTag(val); setPage(1); }} options={[{ value: 'ALL', label: 'All Tags' }, ...tags.map(t => ({ value: t, label: t }))]} containerStyle={{ width: '180px', height: '40px' }} />
+                    <CustomSelect icon={Clock} value={activeShift} onChange={(val) => { setActiveShift(val); setPage(1); }} options={[{ value: 'ALL', label: 'All Shifts' }, ...shifts.map(s => ({ value: s, label: s }))]} containerStyle={{ width: '220px', height: '40px' }} />
+                    <CustomSelect icon={Users} value={teamCategory} onChange={(val) => { setTeamCategory(val); setPage(1); }} options={[{ value: 'ALL', label: 'All Teams' }, ...teams.map(t => ({ value: t, label: t }))]} containerStyle={{ width: '180px', height: '40px' }} />
 
-                        <div className="qc-filter-wrapper" style={{ height: '40px' }}>
-                            <Calendar size={16} color="var(--text-muted)" />
-                            <input type="date" value={startDate} onChange={(e) => handleManualDateChange(setStartDate, e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none' }} />
-                            <span style={{ color: 'var(--text-muted)' }}>to</span>
-                            <input type="date" value={endDate} onChange={(e) => handleManualDateChange(setEndDate, e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none' }} />
-                        </div>
+                    <div className="qc-filter-wrapper" style={{ height: '40px' }}>
+                        <Calendar size={16} color="var(--text-muted)" />
+                        <input type="date" value={startDate} onChange={(e) => handleManualDateChange(setStartDate, e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none' }} />
+                        <span style={{ color: 'var(--text-muted)' }}>to</span>
+                        <input type="date" value={endDate} onChange={(e) => handleManualDateChange(setEndDate, e.target.value)} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none' }} />
                     </div>
+                </div>
 
-                    {/* RIGHT SIDE: Search Bar & Export Button */}
-                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', flexGrow: 1, justifyContent: 'flex-end' }}>
-                        <div className="qc-filter-wrapper search-wrapper" style={{ height: '40px', maxWidth: '300px', flexGrow: 1 }}>
-                            <Search size={16} color="var(--text-muted)" />
-                            <input 
-                                type="text" 
-                                placeholder="Search Producer..." 
-                                value={searchQuery} 
-                                onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }} 
-                                style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none', fontSize: '13px', width: '100%' }} 
-                            />
-                        </div>
-
-                        <button onClick={handleExportPDF} disabled={totalRecords === 0 || isExporting} style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: totalRecords === 0 ? 'var(--bg-secondary)' : 'var(--primary)', color: totalRecords === 0 ? 'var(--text-muted)' : 'white', border: totalRecords === 0 ? '1px solid var(--border-color)' : 'none', padding: '0 16px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: totalRecords === 0 ? 'not-allowed' : 'pointer', height: '40px', flexShrink: 0 }}>
-                            <Download size={16} /> {isExporting ? 'Generating...' : 'Export PDF'}
-                        </button>
+                <div style={{ display: 'flex' }}>
+                    <div className="qc-filter-wrapper search-wrapper" style={{ height: '40px', width: '100%', maxWidth: '400px' }}>
+                        <Search size={16} color="var(--text-muted)" />
+                        <input type="text" placeholder="Search Producer..." value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none', fontSize: '13px', width: '100%' }} />
                     </div>
-
                 </div>
             </div>
 
-            {/* TABLE */}
             <div style={{ background: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '8px', overflowX: 'auto', marginBottom: '16px' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                     <thead>
                         <tr>
                             <th className="att-th">Producer</th>
+                            <th className="att-th">Team Details</th>
                             <th className="att-th" style={{ textAlign: 'center' }}>Present Days</th>
                             <th className="att-th" style={{ textAlign: 'center' }}>Total Videos</th>
                             <th className="att-th" style={{ textAlign: 'center' }}>Recorded Hours</th>
@@ -360,12 +323,40 @@ export default function AttendanceDashboard() {
                     </thead>
                     <tbody>
                         {isLoading ? (
-                            <tr><td colSpan="6" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}><Loader2 className="spinning" size={24} style={{ margin: '0 auto' }} /></td></tr>
+                            <tr><td colSpan="7" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}><Loader2 className="spinning" size={24} style={{ margin: '0 auto' }} /></td></tr>
                         ) : attendance.length > 0 ? (
                             attendance.map((record) => {
+                                const mapping = userMappings.find(m => m.username === record.producer);
+                                const teamName = mapping && mapping.teamName !== 'Unassigned' ? mapping.teamName : 'Unassigned';
+                                const config = teamConfigs.find(c => c.name === teamName);
+                                const tag = config ? config.tag : 'N/A';
+                                const shift = config ? config.timingSlot : 'N/A';
+
                                 return (
                                     <tr key={record.producer} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                        <td style={{ padding: '16px', color: 'var(--text-main)', fontWeight: '600' }}>{record.producer}</td>
+                                        <td style={{ padding: '16px', color: 'var(--text-main)', fontWeight: '600' }}>
+                                            {record.producer}
+                                        </td>
+                                        
+                                        {/* --- NEW DETAILS COLUMN --- */}
+                                        <td style={{ padding: '12px 16px' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-main)' }}>{teamName}</span>
+                                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                                    {tag !== 'N/A' && (
+                                                        <span style={{ fontSize: '10px', background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)', padding: '2px 6px', borderRadius: '4px', color: '#8b5cf6', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                                            <TagIcon size={10} /> {tag}
+                                                        </span>
+                                                    )}
+                                                    {shift !== 'N/A' && (
+                                                        <span style={{ fontSize: '10px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '2px 6px', borderRadius: '4px', color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                                            <Clock size={10} /> {shift}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </td>
+
                                         <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: '#10b981' }}>{record.presentDays}</td>
                                         <td style={{ padding: '16px', textAlign: 'center', fontWeight: '600' }}>{record.totalVideos}</td>
                                         <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: 'var(--primary)' }}>{formatOfficeHours(record.totalRecordedSec)}</td>
@@ -379,7 +370,7 @@ export default function AttendanceDashboard() {
                                 )
                             })
                         ) : (
-                            <tr><td colSpan="6" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>No records found.</td></tr>
+                            <tr><td colSpan="7" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>No records found.</td></tr>
                         )}
                     </tbody>
                 </table>
@@ -395,7 +386,6 @@ export default function AttendanceDashboard() {
                 </div>
             )}
 
-            {/* --- RIGHT OVERLAY SIDEBAR (Solid Background + Calendar) --- */}
             <div className={`attendance-overlay ${selectedProducer ? 'open' : ''}`}>
                 <div className="overlay-header">
                     <div>
@@ -408,7 +398,6 @@ export default function AttendanceDashboard() {
                 <div className="overlay-content">
                     {renderCalendar()}
 
-                    {/* Show selected date details */}
                     {selectedDateObj && (
                         <div className="daily-record-card" style={{ marginTop: '24px' }}>
                             <div style={{ fontWeight: '600', color: selectedDateObj.absent ? '#ef4444' : 'var(--primary)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
