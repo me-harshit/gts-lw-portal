@@ -71,3 +71,62 @@ export const listBackups = (req, res) => {
         res.status(500).json({ error: "Failed to read backup directory." });
     }
 };
+
+export const exportAllRecordsCsv = async (req, res) => {
+    try {
+        console.log("📊 [Export Engine] Starting fast CSV stream...");
+
+        // Tell the browser this is a file download immediately
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename=GTS_Records_${new Date().toISOString().split('T')[0]}.csv`);
+
+        // Grab just ONE record to instantly generate the headers
+        const firstRecord = await AllRecord.findOne().lean();
+        if (!firstRecord) {
+            return res.status(404).send("No records found in database.");
+        }
+
+        // Filter out internal MongoDB fields
+        const headers = Object.keys(firstRecord).filter(key => key !== '_id' && key !== '__v');
+
+        // Write the header row directly to the output stream
+        res.write(headers.join(',') + '\n');
+
+        // Create a MongoDB cursor to stream data in small batches (Prevents RAM overload)
+        const cursor = AllRecord.find({}).lean().cursor({ batchSize: 500 });
+
+        // As data streams in, format it and pipe it instantly to the user's browser
+        cursor.on('data', (doc) => {
+            const rowData = headers.map(header => {
+                let cellData = doc[header];
+                if (cellData === null || cellData === undefined) return '""';
+                
+                // Escape existing quotes and wrap in quotes to handle commas safely
+                cellData = cellData.toString().replace(/"/g, '""');
+                return `"${cellData}"`;
+            });
+            
+            // Push chunk to browser
+            res.write(rowData.join(',') + '\n');
+        });
+
+        // When the database finishes sending data, close the stream
+        cursor.on('end', () => {
+            console.log("✅ [Export Engine] Fast CSV stream complete.");
+            res.end();
+        });
+
+        cursor.on('error', (err) => {
+            console.error("Cursor error:", err);
+            res.end();
+        });
+
+    } catch (error) {
+        console.error("🛑 [Export Engine] CSV Export Error:", error);
+        if (!res.headersSent) {
+            res.status(500).json({ error: "Failed to generate CSV export." });
+        } else {
+            res.end();
+        }
+    }
+};

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Database, Layers, ShieldAlert, RefreshCw, Clock, Languages, XCircle, HardDrive, Archive } from 'lucide-react';
+import { Database, Layers, ShieldAlert, RefreshCw, Clock, Languages, XCircle, HardDrive, Archive, Download } from 'lucide-react';
 import { useSync } from '../context/SyncContext';
 import { PROJECTS } from '../config/constants';
 import './ProjectDashboard.css';
@@ -12,10 +12,10 @@ export default function SyncDataPage() {
     const [pendingTranslations, setPendingTranslations] = useState(0);
     const [backups, setBackups] = useState([]);
     const [isBackingUp, setIsBackingUp] = useState(false);
+    const [isDownloadingCSV, setIsDownloadingCSV] = useState(false);
 
     const { syncState, syncType, lastSyncTimes, startTaskSync, startQcSync, startTranslation, translationData, stopTranslationEngine } = useSync();
 
-    // Fetch dynamic data
     useEffect(() => {
         const fetchData = async () => {
             try {
@@ -46,6 +46,30 @@ export default function SyncDataPage() {
         }
     };
 
+    // --- NEW: CSV DOWNLOAD LOGIC ---
+    // Learning Note: To download a file from an API, we request it as a 'blob' (binary large object).
+    // We then create a temporary hidden <a> tag in the DOM, attach the blob's URL to it, click it programmatically, and remove it.
+    const handleDownloadCSV = () => {
+        setIsDownloadingCSV(true);
+        
+        try {
+            // Because it's a GET request that returns an attachment stream, 
+            // we can trigger it instantly by simulating a native browser navigation.
+            // This uses ZERO browser memory, no matter how big the CSV gets.
+            window.location.href = `${API_URL}/api/backups/csv`;
+            
+            // Just resetting the button visually after a short delay 
+            // since the browser handles the actual download in the background.
+            setTimeout(() => {
+                setIsDownloadingCSV(false);
+            }, 2000);
+            
+        } catch (error) {
+            console.error("Failed to trigger CSV download", error);
+            setIsDownloadingCSV(false);
+        }
+    };
+
     const formatTime = (isoString) => {
         if (!isoString) return 'Never synced';
         return new Date(isoString).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' });
@@ -59,7 +83,6 @@ export default function SyncDataPage() {
 
     return (
         <div className="dashboard-card sync-page-container">
-            {/* --- TOP HEADER --- */}
             <div className="sync-page-header">
                 <h2 className="dashboard-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                     <div className="sync-main-icon"><Database size={24} /></div>
@@ -70,9 +93,7 @@ export default function SyncDataPage() {
                 </p>
             </div>
 
-            {/* --- MAIN SYNC CARDS --- */}
             <div className="sync-grid">
-                {/* Task Sync */}
                 <div className="sync-card">
                     <div className="sync-card-header">
                         <div className="sync-icon-wrapper task"><Layers size={24} /></div>
@@ -88,7 +109,6 @@ export default function SyncDataPage() {
                     </button>
                 </div>
 
-                {/* QC Sync */}
                 <div className="sync-card">
                     <div className="sync-card-header">
                         <div className="sync-icon-wrapper qc"><ShieldAlert size={24} /></div>
@@ -104,7 +124,6 @@ export default function SyncDataPage() {
                     </button>
                 </div>
 
-                {/* Translation Engine */}
                 <div className="sync-card">
                     <div className="sync-card-header">
                         <div className="sync-icon-wrapper translate"><Languages size={24} /></div>
@@ -147,20 +166,31 @@ export default function SyncDataPage() {
 
             <div className="sync-divider"></div>
 
-            {/* --- BOTTOM DASHBOARDS (BACKUPS ONLY) --- */}
             <div className="bottom-dashboards single-column">
-                
-                {/* Backups List */}
                 <div className="bottom-card backups-card">
                     <div className="bottom-card-header">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <div className="icon-badge success"><HardDrive size={20} /></div>
                             <h3 style={{ margin: 0, color: 'var(--text-main)', fontSize: '18px' }}>Local Data Vault</h3>
                         </div>
-                        <button className="create-backup-btn" onClick={handleCreateBackup} disabled={isBackingUp || syncState === 'syncing'}>
-                            {isBackingUp ? <RefreshCw size={14} className="spinning" /> : <Archive size={14} />}
-                            {isBackingUp ? 'Creating Vault...' : 'Create Backup'}
-                        </button>
+                        
+                        {/* BUTTON CONTAINER FOR CSV AND BACKUP */}
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                            <button 
+                                className="create-backup-btn" 
+                                onClick={handleDownloadCSV} 
+                                disabled={isDownloadingCSV || syncState === 'syncing'}
+                                style={{ backgroundColor: 'var(--bg-main)', color: 'var(--text-main)', border: '1px solid var(--border-color)' }}
+                            >
+                                {isDownloadingCSV ? <RefreshCw size={14} className="spinning" /> : <Download size={14} />}
+                                {isDownloadingCSV ? 'Generating...' : 'Download CSV'}
+                            </button>
+
+                            <button className="create-backup-btn" onClick={handleCreateBackup} disabled={isBackingUp || syncState === 'syncing'}>
+                                {isBackingUp ? <RefreshCw size={14} className="spinning" /> : <Archive size={14} />}
+                                {isBackingUp ? 'Creating Vault...' : 'Create Backup'}
+                            </button>
+                        </div>
                     </div>
                     <p className="bottom-card-desc">Hard backups stored directly on your server disk as JSON snapshots. These cannot be altered by third-party APIs.</p>
 
@@ -191,7 +221,6 @@ export default function SyncDataPage() {
                         </table>
                     </div>
                 </div>
-
             </div>
         </div>
     );
