@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useQuery } from '@tanstack/react-query';
 import {
     Filter, Calendar, User, ListChecks, Search,
-    ChevronDown, Activity, Loader2
+    ChevronDown, Activity, Loader2, Tag as TagIcon, Clock, Users
 } from 'lucide-react';
 import { formatDuration } from '../utils/timeFormat';
 import './TaskDashboard.css';
@@ -12,7 +12,7 @@ import './ProjectDashboard.css';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 // --- REUSABLE CUSTOM SELECT COMPONENT ---
-const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder }) => {
+const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder, containerStyle }) => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
 
@@ -27,13 +27,15 @@ const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder }) => 
     const selectedLabel = options.find(o => o.value === value)?.label || placeholder;
 
     return (
-        <div className="searchable-dropdown-container" style={{ width: 'auto', minWidth: '160px' }} ref={dropdownRef}>
-            <div className="searchable-dropdown-header" onClick={() => setIsOpen(!isOpen)}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {Icon && <Icon size={16} color="var(--text-muted)" />}
-                    <span>{selectedLabel}</span>
+        <div className="searchable-dropdown-container" style={containerStyle || { width: 'auto', minWidth: '160px' }} ref={dropdownRef}>
+            <div className="searchable-dropdown-header" onClick={() => setIsOpen(!isOpen)} style={{ height: '100%', width: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
+                    {Icon && <Icon size={16} color="var(--text-muted)" style={{ flexShrink: 0 }} />}
+                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', width: '100%' }}>
+                        {selectedLabel}
+                    </span>
                 </div>
-                <ChevronDown size={16} color="var(--text-muted)" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }} />
+                <ChevronDown size={16} color="var(--text-muted)" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s', flexShrink: 0 }} />
             </div>
             {isOpen && (
                 <div className="searchable-dropdown-menu">
@@ -57,10 +59,14 @@ const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder }) => 
 export default function ProjectDashboard() {
     // Global Filters 
     const [viewCategory, setViewCategory] = useState('ALL');
-    const [teamCategory, setTeamCategory] = useState('ALL');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [activeGlobalFilter, setActiveGlobalFilter] = useState('allTime');
+
+    // Metadata Filters
+    const [activeTag, setActiveTag] = useState('ALL');
+    const [activeShift, setActiveShift] = useState('ALL');
+    const [teamCategory, setTeamCategory] = useState('ALL');
 
     // Producer Specific Filters
     const [prodStartDate, setProdStartDate] = useState('');
@@ -68,8 +74,12 @@ export default function ProjectDashboard() {
     const [activeProdFilter, setActiveProdFilter] = useState('allTime');
 
     // Meta Data State
+    const [tags, setTags] = useState([]);
+    const [shifts, setShifts] = useState([]);
     const [teams, setTeams] = useState([]);
-    const [producers, setProducers] = useState([]);
+    const [teamConfigs, setTeamConfigs] = useState([]);
+    const [userMappings, setUserMappings] = useState([]);
+
     const [selectedProducer, setSelectedProducer] = useState(null);
 
     // Custom Dropdown State for Producer Search
@@ -120,28 +130,49 @@ export default function ProjectDashboard() {
     };
 
     useEffect(() => {
-        const fetchMeta = async () => {
+        const fetchMetadata = async () => {
             try {
-                const res = await axios.get(`${API_URL}/api/teams`);
-                const mappings = res.data;
-                const uniqueTeams = new Set(mappings.map(m => m.teamName));
-                setTeams(Array.from(uniqueTeams));
-                setProducers(mappings);
-            } catch (error) { console.error("Failed to load meta data", error); }
+                const [configsRes, tagsRes, shiftsRes, mapsRes] = await Promise.all([
+                    axios.get(`${API_URL}/api/teams/configs`),
+                    axios.get(`${API_URL}/api/teams/tags`),
+                    axios.get(`${API_URL}/api/teams/shifts`),
+                    axios.get(`${API_URL}/api/teams`)
+                ]);
+                
+                setTeamConfigs(configsRes.data);
+                setTags(tagsRes.data.map(t => t.name));
+                setShifts(shiftsRes.data.map(s => s.name));
+                setUserMappings(mapsRes.data);
+                setTeams(Array.from(new Set(configsRes.data.map(c => c.name))));
+            } catch (error) { console.error("Failed to load metadata", error); }
         };
-        fetchMeta();
+        fetchMetadata();
     }, []);
 
+    // Filter Logic for Global Summary
+    let matchingTeams = teamConfigs;
+    if (activeTag !== 'ALL') matchingTeams = matchingTeams.filter(t => t.tag === activeTag);
+    if (activeShift !== 'ALL') matchingTeams = matchingTeams.filter(t => t.timingSlot === activeShift);
+    if (teamCategory !== 'ALL') matchingTeams = matchingTeams.filter(t => t.name === teamCategory);
+
+    let teamQuery = 'ALL';
+    if ((activeTag !== 'ALL' || activeShift !== 'ALL' || teamCategory !== 'ALL') && matchingTeams.length === 0) {
+        teamQuery = '___NONE___'; 
+    } else if (activeTag !== 'ALL' || activeShift !== 'ALL' || teamCategory !== 'ALL') {
+        teamQuery = matchingTeams.map(t => t.name).join(',');
+    }
+
     const { data: summary, isFetching: isFetchingSummary } = useQuery({
-        queryKey: ['projectSummary', viewCategory, teamCategory, startDate, endDate],
+        queryKey: ['projectSummary', viewCategory, teamQuery, startDate, endDate, teamConfigs.length],
         queryFn: async () => {
-            let url = `${API_URL}/api/dashboard/stats/summary?category=${viewCategory}&teamName=${teamCategory}`;
+            let url = `${API_URL}/api/dashboard/stats/summary?category=${viewCategory}&teams=${teamQuery}`;
             if (startDate && endDate) url += `&startDate=${startDate}&endDate=${endDate}`;
             const res = await axios.get(url);
             return res.data;
         },
         placeholderData: (prev) => prev,
-        refetchOnWindowFocus: false
+        refetchOnWindowFocus: false,
+        enabled: teamConfigs.length > 0
     });
 
     const { data: producerData, isFetching: isFetchingProducer } = useQuery({
@@ -157,7 +188,16 @@ export default function ProjectDashboard() {
         refetchOnWindowFocus: false
     });
 
-    const filteredProducers = producers.filter(p => {
+    const enrichedProducers = userMappings.map(p => {
+        const config = teamConfigs.find(c => c.name === p.teamName);
+        return { 
+            ...p, 
+            tag: config ? config.tag : 'N/A',
+            shift: config ? config.timingSlot : 'N/A'
+        };
+    });
+
+    const filteredProducers = enrichedProducers.filter(p => {
         const matchesTeam = teamCategory === 'ALL' || p.teamName === teamCategory;
         const matchesSearch = p.username.toLowerCase().includes(producerSearch.toLowerCase());
         return matchesTeam && matchesSearch;
@@ -177,23 +217,26 @@ export default function ProjectDashboard() {
     const inspectedCount = acceptedCount + rejectedCount;
     const inspectedHours = acceptedHours + rejectedHours;
 
-    // Fixed Rates: Using duration strictly instead of counts
     const acceptanceRate = inspectedHours > 0 ? ((acceptedHours / inspectedHours) * 100).toFixed(2) : '0.00';
     const rejectionRate = inspectedHours > 0 ? ((rejectedHours / inspectedHours) * 100).toFixed(2) : '0.00';
     const pendingRate = totalHours > 0 ? ((pendingHours / totalHours) * 100).toFixed(2) : '0.00';
     const inspectedRate = totalHours > 0 ? ((inspectedHours / totalHours) * 100).toFixed(2) : '0.00';
 
     return (
-        <div className="dashboard-card">
+        <div className="dashboard-card" style={{ maxWidth: '1400px', margin: '0 auto' }}>
 
-            {/* TOP BAR: Title & Global Filters */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {/* ============================== */}
+            {/* HEADER & GLOBAL FILTERS */}
+            {/* ============================== */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '32px' }}>
+                
+                {/* ROW 1: Title & Quick Filters */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
                     <h2 className="dashboard-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                         <Activity color="var(--primary)" size={24} />
                         Project Overview
                     </h2>
-                    <div className="quick-filters-container">
+                    <div className="quick-filters-container" style={{ margin: 0 }}>
                         <button className={`quick-filter-btn ${activeGlobalFilter === 'allTime' ? 'active' : ''}`} onClick={() => applyQuickFilter('allTime', setStartDate, setEndDate, setActiveGlobalFilter)}>All Time</button>
                         <button className={`quick-filter-btn ${activeGlobalFilter === 'today' ? 'active' : ''}`} onClick={() => applyQuickFilter('today', setStartDate, setEndDate, setActiveGlobalFilter)}>Today</button>
                         <button className={`quick-filter-btn ${activeGlobalFilter === 'yesterday' ? 'active' : ''}`} onClick={() => applyQuickFilter('yesterday', setStartDate, setEndDate, setActiveGlobalFilter)}>Yesterday</button>
@@ -202,19 +245,30 @@ export default function ProjectDashboard() {
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                    <div className="searchable-dropdown-header" style={{ cursor: 'default', height: '40px' }}>
-                        <Calendar size={16} color="var(--text-muted)" />
-                        <input type="date" value={startDate} onChange={(e) => handleDateChange(setStartDate, e.target.value, setActiveGlobalFilter)} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none', paddingLeft: '8px' }} />
-                        <span style={{ color: 'var(--text-muted)', margin: '0 8px' }}>to</span>
-                        <input type="date" value={endDate} onChange={(e) => handleDateChange(setEndDate, e.target.value, setActiveGlobalFilter)} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none' }} />
-                    </div>
-
-                    <CustomSelect
-                        icon={User}
-                        value={teamCategory}
-                        onChange={setTeamCategory}
-                        options={[{ value: 'ALL', label: 'All Teams' }, ...teams.map(t => ({ value: t, label: t }))]}
+                {/* ROW 2: Dropdowns & Project Category */}
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <CustomSelect 
+                        icon={TagIcon} 
+                        value={activeTag} 
+                        onChange={setActiveTag} 
+                        options={[{ value: 'ALL', label: 'All Tags' }, ...tags.map(t => ({ value: t, label: t }))]} 
+                        containerStyle={{ width: '180px', height: '40px' }} 
+                    />
+                    
+                    <CustomSelect 
+                        icon={Clock} 
+                        value={activeShift} 
+                        onChange={setActiveShift} 
+                        options={[{ value: 'ALL', label: 'All Shifts' }, ...shifts.map(s => ({ value: s, label: s }))]} 
+                        containerStyle={{ width: '220px', height: '40px' }} 
+                    />
+                    
+                    <CustomSelect 
+                        icon={Users} 
+                        value={teamCategory} 
+                        onChange={setTeamCategory} 
+                        options={[{ value: 'ALL', label: 'All Teams' }, ...teams.map(t => ({ value: t, label: t }))]} 
+                        containerStyle={{ width: '180px', height: '40px' }} 
                     />
 
                     <CustomSelect
@@ -226,7 +280,15 @@ export default function ProjectDashboard() {
                             { value: 'OFFICE', label: 'Office Tasks' },
                             { value: 'HOUSE', label: 'House Tasks' }
                         ]}
+                        containerStyle={{ width: '180px', height: '40px' }} 
                     />
+
+                    <div className="searchable-dropdown-header" style={{ cursor: 'default', height: '40px' }}>
+                        <Calendar size={16} color="var(--text-muted)" />
+                        <input type="date" value={startDate} onChange={(e) => handleDateChange(setStartDate, e.target.value, setActiveGlobalFilter)} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none', paddingLeft: '8px' }} />
+                        <span style={{ color: 'var(--text-muted)', margin: '0 8px' }}>to</span>
+                        <input type="date" value={endDate} onChange={(e) => handleDateChange(setEndDate, e.target.value, setActiveGlobalFilter)} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none' }} />
+                    </div>
                 </div>
             </div>
 
@@ -276,13 +338,13 @@ export default function ProjectDashboard() {
             {/* --- PRODUCER ANALYTICS SECTION --- */}
             <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '40px 0 24px 0' }} />
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
                     <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)' }}>
                         <ListChecks size={20} color="var(--primary)" />
                         Producer Analytics
                     </h3>
-                    <div className="quick-filters-container">
+                    <div className="quick-filters-container" style={{ margin: 0 }}>
                         <button className={`quick-filter-btn ${activeProdFilter === 'allTime' ? 'active' : ''}`} onClick={() => applyQuickFilter('allTime', setProdStartDate, setProdEndDate, setActiveProdFilter)}>All Time</button>
                         <button className={`quick-filter-btn ${activeProdFilter === 'today' ? 'active' : ''}`} onClick={() => applyQuickFilter('today', setProdStartDate, setProdEndDate, setActiveProdFilter)}>Today</button>
                         <button className={`quick-filter-btn ${activeProdFilter === 'yesterday' ? 'active' : ''}`} onClick={() => applyQuickFilter('yesterday', setProdStartDate, setProdEndDate, setActiveProdFilter)}>Yesterday</button>
@@ -299,11 +361,11 @@ export default function ProjectDashboard() {
                         <input type="date" value={prodEndDate} onChange={(e) => handleDateChange(setProdEndDate, e.target.value, setActiveProdFilter)} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none' }} />
                     </div>
 
-                    <div className="searchable-dropdown-container" style={{ width: 'auto', minWidth: '240px' }} ref={dropdownRef}>
-                        <div className="searchable-dropdown-header" onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
+                    <div className="searchable-dropdown-container" style={{ width: '100%', maxWidth: '400px' }} ref={dropdownRef}>
+                        <div className="searchable-dropdown-header" onClick={() => setIsDropdownOpen(!isDropdownOpen)} style={{ height: '40px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <User size={16} color="var(--text-muted)" />
-                                <span>{selectedProducer ? selectedProducer.username : '-- Select Producer --'}</span>
+                                <span>{selectedProducer ? selectedProducer.username : '-- Search Specific Producer --'}</span>
                             </div>
                             <ChevronDown size={16} color="var(--text-muted)" style={{ transform: isDropdownOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }} />
                         </div>
@@ -318,8 +380,12 @@ export default function ProjectDashboard() {
                                     {filteredProducers.length > 0 ? (
                                         filteredProducers.map(p => (
                                             <li key={p.username} className={`searchable-dropdown-item ${selectedProducer?.username === p.username ? 'active' : ''}`} onClick={() => { setSelectedProducer(p); setIsDropdownOpen(false); setProducerSearch(''); }}>
-                                                {p.username}
-                                                <span className="searchable-dropdown-item-team">{p.teamName}</span>
+                                                <div style={{ fontWeight: '600' }}>{p.username}</div>
+                                                <div style={{ display: 'flex', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
+                                                    <span style={{ fontSize: '10px', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: '4px', color: 'var(--text-muted)' }}>{p.teamName}</span>
+                                                    {p.tag !== 'N/A' && <span style={{ fontSize: '10px', background: 'rgba(139, 92, 246, 0.1)', padding: '2px 6px', borderRadius: '4px', color: '#8b5cf6' }}>{p.tag}</span>}
+                                                    {p.shift !== 'N/A' && <span style={{ fontSize: '10px', background: 'rgba(59, 130, 246, 0.1)', padding: '2px 6px', borderRadius: '4px', color: '#3b82f6' }}>{p.shift}</span>}
+                                                </div>
                                             </li>
                                         ))
                                     ) : (
@@ -389,10 +455,19 @@ export default function ProjectDashboard() {
                             <tbody>
                                 {producerData?.tasks?.length > 0 ? (
                                     producerData.tasks.map(task => {
-                                        // Fixed Rates: Calculating percentages based on duration instead of counts
-                                        const passedPct = task.totalSec > 0 ? Math.round((task.passedSec / task.totalSec) * 100) : 0;
-                                        const failedPct = task.totalSec > 0 ? Math.round((task.failedSec / task.totalSec) * 100) : 0;
-                                        const waitingPct = task.totalSec > 0 ? Math.round((task.waitingSec / task.totalSec) * 100) : 0;
+                                        // --- FIX: Safely fallback to whichever key the backend provides ---
+                                        const safePassedSec = task.passedSec || task.acceptedSec || 0;
+                                        const safeFailedSec = task.failedSec || task.rejectedSec || 0;
+                                        const safeWaitingSec = task.waitingSec || 0;
+                                        const totalSec = task.totalSec || 1; // Prevent division by zero
+
+                                        const safePassedVideos = task.passedVideos || task.acceptedVideos || 0;
+                                        const safeFailedVideos = task.failedVideos || task.rejectedVideos || 0;
+                                        const safeWaitingVideos = task.waitingVideos || 0;
+
+                                        const passedPct = task.totalSec > 0 ? Math.round((safePassedSec / totalSec) * 100) : 0;
+                                        const failedPct = task.totalSec > 0 ? Math.round((safeFailedSec / totalSec) * 100) : 0;
+                                        const waitingPct = task.totalSec > 0 ? Math.round((safeWaitingSec / totalSec) * 100) : 0;
 
                                         return (
                                             <tr key={task._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
@@ -405,15 +480,15 @@ export default function ProjectDashboard() {
                                                     <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{formatDuration(task.totalSec)}</div>
                                                 </td>
                                                 <td style={{ padding: '14px 16px', textAlign: 'center' }}>
-                                                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#10b981' }}>{task.passedVideos}</div>
+                                                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#10b981' }}>{safePassedVideos}</div>
                                                     <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{passedPct}%</div>
                                                 </td>
                                                 <td style={{ padding: '14px 16px', textAlign: 'center' }}>
-                                                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#ef4444' }}>{task.failedVideos}</div>
+                                                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#ef4444' }}>{safeFailedVideos}</div>
                                                     <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{failedPct}%</div>
                                                 </td>
                                                 <td style={{ padding: '14px 16px', textAlign: 'center' }}>
-                                                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#f59e0b' }}>{task.waitingVideos}</div>
+                                                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#f59e0b' }}>{safeWaitingVideos}</div>
                                                     <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{waitingPct}%</div>
                                                 </td>
                                             </tr>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
 import axios from 'axios';
 import { useQuery } from '@tanstack/react-query';
-import { Calendar, User, Search, ChevronDown, ChevronRight, FileWarning, ShieldAlert, Users, ListFilter, AlertCircle, Video, Tag as TagIcon, Clock, Loader2 } from 'lucide-react';
+import { Calendar, User, Search, ChevronDown, ChevronRight, FileWarning, ShieldAlert, Users, ListFilter, AlertCircle, Video, Tag as TagIcon, Clock, Loader2, FolderSearch } from 'lucide-react';
 import './TaskDashboard.css';
 import './ProjectDashboard.css';
 import './QcDashboard.css';
@@ -82,6 +82,11 @@ export default function QcDashboard() {
     const [reasonSearch, setReasonSearch] = useState('');
     const reasonRef = useRef(null);
 
+    const [selectedTask, setSelectedTask] = useState(null);
+    const [isTaskOpen, setIsTaskOpen] = useState(false);
+    const [taskSearch, setTaskSearch] = useState('');
+    const taskRef = useRef(null);
+
     // Accordions
     const [expandedTops, setExpandedTops] = useState(new Set());
     const [expandedTasks, setExpandedTasks] = useState(new Set());
@@ -104,6 +109,7 @@ export default function QcDashboard() {
         const handleClickOutside = (event) => {
             if (producerRef.current && !producerRef.current.contains(event.target)) setIsProducerOpen(false);
             if (reasonRef.current && !reasonRef.current.contains(event.target)) setIsReasonOpen(false);
+            if (taskRef.current && !taskRef.current.contains(event.target)) setIsTaskOpen(false);
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -142,12 +148,13 @@ export default function QcDashboard() {
     }
 
     const { data: qcData, isFetching } = useQuery({
-        queryKey: ['qcDetails', startDate, endDate, teamQuery, viewMode, selectedProducer?.username, selectedReason],
+        queryKey: ['qcDetails', startDate, endDate, teamQuery, viewMode, selectedProducer?.username, selectedReason, selectedTask?.id],
         queryFn: async () => {
             let url = `${API_URL}/api/dashboard/stats/qc-details?teams=${teamQuery}&viewMode=${viewMode}`;
             if (startDate && endDate) url += `&startDate=${startDate}&endDate=${endDate}`;
             if (viewMode === 'BY_PRODUCER' && selectedProducer) url += `&producer=${selectedProducer.username}`;
             else if (viewMode === 'BY_REASON' && selectedReason) url += `&reason=${encodeURIComponent(selectedReason)}`;
+            else if (viewMode === 'BY_TASK' && selectedTask) url += `&taskId=${encodeURIComponent(selectedTask.id)}`;
             
             const res = await axios.get(url);
             return res.data;
@@ -156,7 +163,6 @@ export default function QcDashboard() {
         enabled: teamConfigs.length > 0
     });
 
-    // 关联制作人与其对应的团队与标签信息
     const enrichedProducers = userMappings.map(p => {
         const config = teamConfigs.find(c => c.name === p.teamName);
         return { 
@@ -175,6 +181,9 @@ export default function QcDashboard() {
     const dynamicReasons = qcData?.dynamicReasons || [];
     const filteredReasons = dynamicReasons.filter(r => r.toLowerCase().includes(reasonSearch.toLowerCase()));
 
+    const dynamicTasks = qcData?.dynamicTasks || [];
+    const filteredTasks = dynamicTasks.filter(t => t.name.toLowerCase().includes(taskSearch.toLowerCase()));
+
     const toggleTopLevel = (title) => {
         const newExpanded = new Set(expandedTops);
         if (newExpanded.has(title)) newExpanded.delete(title);
@@ -191,6 +200,12 @@ export default function QcDashboard() {
 
     const stats = qcData?.stats || { totalVideos: 0, qcDone: 0, accepted: 0, rejected: 0, waiting: 0 };
     const rejectionTree = qcData?.rejectionTree || [];
+
+    const getDynamicHeaderTitle = () => {
+        if (viewMode === 'BY_PRODUCER') return 'Failure Analysis by Producer';
+        if (viewMode === 'BY_REASON') return 'Failure Analysis by Reason';
+        return 'Failure Analysis by Task';
+    };
 
     return (
         <div className="dashboard-card" style={{ maxWidth: '1400px', margin: '0 auto' }}>
@@ -242,20 +257,27 @@ export default function QcDashboard() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-secondary)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', flexWrap: 'wrap', gap: '16px' }}>
                     <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-main)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                         <button 
-                            onClick={() => { setViewMode('BY_PRODUCER'); setSelectedReason(null); }}
+                            onClick={() => { setViewMode('BY_PRODUCER'); setSelectedReason(null); setSelectedTask(null); }}
                             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px', background: viewMode === 'BY_PRODUCER' ? 'var(--primary)' : 'transparent', color: viewMode === 'BY_PRODUCER' ? '#fff' : 'var(--text-muted)', transition: 'all 0.2s' }}
                         >
-                            <User size={14} /> By Reason
+                            <User size={14} /> By Producer
                         </button>
                         <button 
-                            onClick={() => { setViewMode('BY_REASON'); setSelectedProducer(null); }}
+                            onClick={() => { setViewMode('BY_REASON'); setSelectedProducer(null); setSelectedTask(null); }}
                             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px', background: viewMode === 'BY_REASON' ? 'var(--primary)' : 'transparent', color: viewMode === 'BY_REASON' ? '#fff' : 'var(--text-muted)', transition: 'all 0.2s' }}
                         >
-                            <ListFilter size={14} /> By Producer
+                            <FileWarning size={14} /> By Reason
+                        </button>
+                        <button 
+                            onClick={() => { setViewMode('BY_TASK'); setSelectedProducer(null); setSelectedReason(null); }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '13px', background: viewMode === 'BY_TASK' ? 'var(--primary)' : 'transparent', color: viewMode === 'BY_TASK' ? '#fff' : 'var(--text-muted)', transition: 'all 0.2s' }}
+                        >
+                            <ListFilter size={14} /> By Task
                         </button>
                     </div>
 
-                    {viewMode === 'BY_PRODUCER' ? (
+                    {/* DYNAMIC DROPDOWN BASED ON VIEW MODE */}
+                    {viewMode === 'BY_PRODUCER' && (
                         <div className="custom-dropdown-container" ref={producerRef} style={{ width: '100%', maxWidth: '350px' }}>
                             <div className="custom-dropdown-header" onClick={() => setIsProducerOpen(!isProducerOpen)} style={{ background: 'var(--bg-main)', height: '40px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
@@ -279,10 +301,9 @@ export default function QcDashboard() {
                                         {filteredProducers.map(p => (
                                             <li key={p.username} className={`custom-dropdown-item ${selectedProducer?.username === p.username ? 'active' : ''}`} onClick={() => { setSelectedProducer(p); setIsProducerOpen(false); setProducerSearch(''); }}>
                                                 <div style={{ fontWeight: '600' }}>{p.username}</div>
-                                                <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
+                                                <div style={{ display: 'flex', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
                                                     <span style={{ fontSize: '10px', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: '4px', color: 'var(--text-muted)' }}>{p.teamName}</span>
-                                                    {p.tag !== 'N/A' && <span style={{ fontSize: '10px', background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)', padding: '2px 6px', borderRadius: '4px', color: '#8b5cf6', display: 'flex', alignItems: 'center', gap: '3px' }}><TagIcon size={10} /> {p.tag}</span>}
-                                                    {p.shift !== 'N/A' && <span style={{ fontSize: '10px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '2px 6px', borderRadius: '4px', color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '3px' }}><Clock size={10} /> {p.shift}</span>}
+                                                    {p.tag !== 'N/A' && <span style={{ fontSize: '10px', background: 'rgba(139, 92, 246, 0.1)', padding: '2px 6px', borderRadius: '4px', color: '#8b5cf6' }}>{p.tag}</span>}
                                                 </div>
                                             </li>
                                         ))}
@@ -290,7 +311,9 @@ export default function QcDashboard() {
                                 </div>
                             )}
                         </div>
-                    ) : (
+                    )}
+
+                    {viewMode === 'BY_REASON' && (
                         <div className="custom-dropdown-container" ref={reasonRef} style={{ width: '100%', maxWidth: '400px' }}>
                             <div className="custom-dropdown-header" onClick={() => setIsReasonOpen(!isReasonOpen)} style={{ background: 'var(--bg-main)', height: '40px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
@@ -317,6 +340,38 @@ export default function QcDashboard() {
                                             </li>
                                         ))}
                                         {filteredReasons.length === 0 && <li style={{ padding: '10px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>No reasons found.</li>}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {viewMode === 'BY_TASK' && (
+                        <div className="custom-dropdown-container" ref={taskRef} style={{ width: '100%', maxWidth: '400px' }}>
+                            <div className="custom-dropdown-header" onClick={() => setIsTaskOpen(!isTaskOpen)} style={{ background: 'var(--bg-main)', height: '40px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                                    <FolderSearch size={16} color="var(--text-muted)" style={{ flexShrink: 0 }}/>
+                                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {selectedTask ? selectedTask.name : '-- Filter by Specific Task --'}
+                                    </span>
+                                </div>
+                                <ChevronDown size={16} color="var(--text-muted)" />
+                            </div>
+                            {isTaskOpen && (
+                                <div className="custom-dropdown-menu">
+                                    <div className="custom-dropdown-search">
+                                        <Search size={14} className="custom-dropdown-search-icon" />
+                                        <input type="text" placeholder="Search task ID or name..." value={taskSearch} onChange={(e) => setTaskSearch(e.target.value)} autoFocus />
+                                    </div>
+                                    <ul className="custom-dropdown-list">
+                                        <li className={`custom-dropdown-item ${!selectedTask ? 'active' : ''}`} onClick={() => { setSelectedTask(null); setIsTaskOpen(false); setTaskSearch(''); }}>
+                                            -- All Failed Tasks --
+                                        </li>
+                                        {filteredTasks.map(t => (
+                                            <li key={t.id} className={`custom-dropdown-item ${selectedTask?.id === t.id ? 'active' : ''}`} onClick={() => { setSelectedTask(t); setIsTaskOpen(false); setTaskSearch(''); }}>
+                                                {t.name}
+                                            </li>
+                                        ))}
                                     </ul>
                                 </div>
                             )}
@@ -350,12 +405,16 @@ export default function QcDashboard() {
 
             <h3 style={{ margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)' }}>
                 <ListFilter size={20} color="var(--primary)" />
-                {viewMode === 'BY_PRODUCER' ? 'Failure Analysis by Reason' : 'Failure Analysis by Producer'}
+                {getDynamicHeaderTitle()}
             </h3>
 
             <div className="qc-tree-container" style={{ opacity: isFetching ? 0.6 : 1, transition: 'opacity 0.2s' }}>
                 <div className="qc-tree-header">
-                    <div style={{ flex: 1, paddingLeft: '8px' }}>{viewMode === 'BY_PRODUCER' ? 'Rejection Reason' : 'Producer Name'}</div>
+                    <div style={{ flex: 1, paddingLeft: '8px' }}>
+                        {viewMode === 'BY_PRODUCER' && 'Producer Name'}
+                        {viewMode === 'BY_REASON' && 'Rejection Reason'}
+                        {viewMode === 'BY_TASK' && 'Task ID & Name'}
+                    </div>
                     <div style={{ width: '150px', textAlign: 'right', paddingRight: '8px' }}>Failure Count</div>
                 </div>
 
@@ -367,6 +426,19 @@ export default function QcDashboard() {
                     rejectionTree.map((node, idx) => {
                         const isExpanded = expandedTops.has(node.title);
                         
+                        let producerExtra = null;
+                        if (viewMode === 'BY_PRODUCER') {
+                            const pMap = enrichedProducers.find(p => p.username === node.title);
+                            if (pMap) {
+                                producerExtra = (
+                                    <div style={{ display: 'flex', gap: '6px', marginLeft: '12px' }}>
+                                        <span style={{ fontSize: '10px', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: '4px', color: 'var(--text-muted)', border: '1px solid var(--border-color)' }}>{pMap.teamName}</span>
+                                        {pMap.tag !== 'N/A' && <span style={{ fontSize: '10px', background: 'rgba(139, 92, 246, 0.1)', padding: '2px 6px', borderRadius: '4px', color: '#8b5cf6', border: '1px solid rgba(139, 92, 246, 0.3)' }}><TagIcon size={10} style={{display:'inline', verticalAlign:'middle', marginRight:'2px'}}/>{pMap.tag}</span>}
+                                    </div>
+                                );
+                            }
+                        }
+
                         return (
                             <Fragment key={`top-${idx}`}>
                                 <div className="qc-tree-row level-1" onClick={() => toggleTopLevel(node.title)} style={{ borderBottom: '1px solid var(--border-color)' }}>
@@ -375,8 +447,11 @@ export default function QcDashboard() {
                                             {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                                         </button>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600', color: 'var(--text-main)', fontSize: '14px' }}>
-                                            {viewMode === 'BY_PRODUCER' ? <FileWarning size={16} color="var(--text-muted)" /> : <User size={16} color="var(--text-muted)" />}
+                                            {viewMode === 'BY_PRODUCER' && <User size={16} color="var(--text-muted)" />}
+                                            {viewMode === 'BY_REASON' && <FileWarning size={16} color="var(--text-muted)" />}
+                                            {viewMode === 'BY_TASK' && <FolderSearch size={16} color="var(--text-muted)" />}
                                             {node.title}
+                                            {producerExtra}
                                         </div>
                                     </div>
                                     <div className="qc-badge failed">
@@ -387,7 +462,8 @@ export default function QcDashboard() {
 
                                 {isExpanded && (
                                     <div className="qc-tree-children">
-                                        {node.tasks.map((taskNode, tIdx) => {
+                                        {/* --- NEW: Frontend sorting ensures sub-levels are always perfectly sorted --- */}
+                                        {node.tasks.sort((a, b) => b.failCount - a.failCount).map((taskNode, tIdx) => {
                                             const taskKey = `${node.title}-${taskNode.taskName}`;
                                             const isTaskExpanded = expandedTasks.has(taskKey);
 
@@ -424,7 +500,7 @@ export default function QcDashboard() {
                                                                                     <Video size={14} />
                                                                                     {vid.dataName}
                                                                                 </div>
-                                                                                {viewMode === 'BY_PRODUCER' && (
+                                                                                {viewMode !== 'BY_PRODUCER' && (
                                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px', marginLeft: '20px' }}>
                                                                                         <User size={10} /> By: {vid.producer}
                                                                                     </div>

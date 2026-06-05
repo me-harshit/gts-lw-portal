@@ -2,79 +2,73 @@ import AllRecord from '../models/AllRecords.js';
 import TeamMap from '../models/TeamMap.js';
 
 export const getDashboardSummary = async (req, res) => {
-    const { category, startDate, endDate, teamName } = req.query;
-
     try {
-        const filter = {};
+        const { category, teams, startDate, endDate } = req.query;
+        let match = { start_produce_time: { $exists: true, $ne: null } };
 
+        // 1. Filter by Project Category (Office vs House)
         if (category && category !== 'ALL') {
-            filter.project_category = category;
+            match.project_category = new RegExp(category, 'i');
         }
 
+        // 2. Smart Team/Tag/Shift Filtering
+        if (teams && teams !== 'ALL') {
+            if (teams === '___NONE___') {
+                match.producer = { $in: [] }; 
+            } else {
+                const teamArray = teams.split(',');
+                const mappings = await TeamMap.find({ teamName: { $in: teamArray } }).lean();
+                match.producer = { $in: mappings.map(m => m.username) };
+            }
+        }
+
+        // 3. Date Filtering
         if (startDate && endDate) {
-            // FIX: Changed 'matchFilter' to 'filter'
-            filter.start_produce_time = {
+            match.start_produce_time = {
                 $gte: new Date(`${startDate}T00:00:00.000Z`),
                 $lte: new Date(`${endDate}T23:59:59.999Z`)
             };
         }
 
-        if (teamName && teamName !== 'ALL') {
-            const teamMembers = await TeamMap.find({ teamName });
-            const targetProducers = teamMembers.map(member => member.username);
-
-            if (targetProducers.length === 0) {
-                return res.json({
-                    accepted: { count: 0, hours: 0 },
-                    rejected: { count: 0, hours: 0 },
-                    pending: { count: 0, hours: 0 },
-                    total: { count: 0, hours: 0 }
-                });
-            }
-            filter.producer = { $in: targetProducers };
-        }
-
-        const stats = await AllRecord.aggregate([
-            { $match: filter },
+        const result = await AllRecord.aggregate([
+            { $match: match },
+            {
+                $addFields: {
+                    safe_video_duration: { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } }
+                }
+            },
             {
                 $group: {
-                    _id: "$inspect_result",
-                    count: { $sum: 1 },
-                    totalDuration: {
-                        $sum: {
-                            $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 }
-                        }
-                    }
+                    _id: null,
+                    totalCount: { $sum: 1 },
+                    totalHours: { $sum: "$safe_video_duration" },
+                    acceptedCount: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_PASSED"] }, 1, 0] } },
+                    acceptedHours: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_PASSED"] }, "$safe_video_duration", 0] } },
+                    rejectedCount: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_FAILED"] }, 1, 0] } },
+                    rejectedHours: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_FAILED"] }, "$safe_video_duration", 0] } },
+                    pendingCount: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_WAITING"] }, 1, 0] } },
+                    pendingHours: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_WAITING"] }, "$safe_video_duration", 0] } }
                 }
             }
         ]);
 
-        const formatStat = (id) => {
-            const stat = stats.find(s => s._id === id);
-            return {
-                count: stat?.count || 0,
-                hours: stat ? parseFloat((stat.totalDuration / 3600).toFixed(2)) : 0
-            };
+        const data = result[0] || {
+            totalCount: 0, totalHours: 0,
+            acceptedCount: 0, acceptedHours: 0,
+            rejectedCount: 0, rejectedHours: 0,
+            pendingCount: 0, pendingHours: 0
         };
 
-        const formatted = {
-            accepted: formatStat('INSPECT_PASSED'),
-            rejected: formatStat('INSPECT_FAILED'),
-            pending: formatStat('INSPECT_WAITING'),
-            total: {
-                count: stats.reduce((acc, curr) => acc + curr.count, 0),
-                hours: parseFloat((stats.reduce((acc, curr) => acc + curr.totalDuration, 0) / 3600).toFixed(2))
-            }
-        };
-
-        const latestRecord = await AllRecord.findOne().sort({ start_produce_time: -1 }).select('start_produce_time');
-
+        // Note: Returning hours by dividing seconds by 3600
         res.json({
-            ...formatted,
-            lastUpdated: latestRecord ? latestRecord.start_produce_time : null
+            total: { count: data.totalCount, hours: data.totalHours / 3600 },
+            accepted: { count: data.acceptedCount, hours: data.acceptedHours / 3600 },
+            rejected: { count: data.rejectedCount, hours: data.rejectedHours / 3600 },
+            pending: { count: data.pendingCount, hours: data.pendingHours / 3600 }
         });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
+    } catch (err) {
+        console.error("Project Summary Error:", err);
+        res.status(500).json({ error: err.message });
     }
 };
 
@@ -167,7 +161,7 @@ export const getProducerHistory = async (req, res) => {
 
 
 export const getQcDetails = async (req, res) => {
-    const { startDate, endDate, teams, viewMode = 'BY_PRODUCER', producer, reason } = req.query;
+    const { startDate, endDate, teams, viewMode = 'BY_PRODUCER', producer, reason, taskId } = req.query;
 
     try {
         let initialMatch = { start_produce_time: { $exists: true, $ne: null } };
@@ -183,7 +177,7 @@ export const getQcDetails = async (req, res) => {
             }
         }
 
-        // 2. Date Filters (Restored your exact logic)
+        // 2. Date Filters
         if (startDate && endDate) {
             initialMatch.start_produce_time = {
                 $gte: new Date(`${startDate}T00:00:00.000Z`),
@@ -193,9 +187,9 @@ export const getQcDetails = async (req, res) => {
 
         // --- CHUNK A: SUMMARY STATS ---
         const statsMatch = { ...initialMatch };
-        if (viewMode === 'BY_PRODUCER' && producer && producer !== 'ALL') {
-            statsMatch.producer = producer;
-        }
+        if (viewMode === 'BY_PRODUCER' && producer && producer !== 'ALL') statsMatch.producer = producer;
+        if (viewMode === 'BY_REASON' && reason && reason !== 'ALL') statsMatch.inspect_issue_description_en = reason;
+        if (viewMode === 'BY_TASK' && taskId && taskId !== 'ALL') statsMatch.platform_task_id = taskId;
 
         const statsPromise = AllRecord.aggregate([
             { $match: statsMatch },
@@ -223,17 +217,24 @@ export const getQcDetails = async (req, res) => {
         // --- CHUNK B: NESTED REJECTION TREE ---
         const treeMatch = { ...initialMatch, inspect_result: 'INSPECT_FAILED' };
         
-        if (viewMode === 'BY_PRODUCER' && producer && producer !== 'ALL') {
-            treeMatch.producer = producer;
-        } else if (viewMode === 'BY_REASON' && reason && reason !== 'ALL') {
-            treeMatch.inspect_error_type_en = reason; // Restored your exact match logic
-        }
+        if (viewMode === 'BY_PRODUCER' && producer && producer !== 'ALL') treeMatch.producer = producer;
+        else if (viewMode === 'BY_REASON' && reason && reason !== 'ALL') treeMatch.inspect_issue_description_en = reason;
+        else if (viewMode === 'BY_TASK' && taskId && taskId !== 'ALL') treeMatch.platform_task_id = taskId;
 
-        const groupByField = viewMode === 'BY_PRODUCER' ? "$reason" : "$producer";
+        let groupByField, subGroupField;
+        if (viewMode === 'BY_REASON') {
+            groupByField = "$reason";
+            subGroupField = "$cleanTaskName";
+        } else if (viewMode === 'BY_TASK') {
+            groupByField = "$cleanTaskName";
+            subGroupField = "$reason"; // Show reason as sub-level for tasks
+        } else { 
+            groupByField = "$producer";
+            subGroupField = "$cleanTaskName";
+        }
 
         const treePromise = AllRecord.aggregate([
             { $match: treeMatch },
-            // RESTORED: Fetch English Task Names from DB
             {
                 $lookup: {
                     from: "tasks",
@@ -245,48 +246,57 @@ export const getQcDetails = async (req, res) => {
             { $unwind: { path: "$taskDetails", preserveNullAndEmptyArrays: true } },
             {
                 $addFields: {
-                    cleanTaskName: { $ifNull: ["$taskDetails.taskName", "$task_name", "Unknown Task"] },
-                    reason: { $ifNull: ["$inspect_error_type_en", "Unspecified Reason"] }, // Reason name
-                    description: { $ifNull: ["$inspect_issue_description_en", "$inspect_issue_description", "No description provided."] }, // Translated sentence
-                    cleanDataName: "$data_name" // Original Video ID
+                    rawTaskName: { $ifNull: ["$taskDetails.taskName", "$task_name", "Unknown Task"] },
+                    taskIdStr: { $ifNull: ["$platform_task_id", "No-ID"] },
+                    reason: { $ifNull: ["$inspect_issue_description_en", "$inspect_issue_description", "Unspecified Reason"] }, 
+                    description: { $ifNull: ["$inspect_issue_description", "No description provided."] }, // Fallback to original
+                    cleanDataName: { $ifNull: ["$data_name_en", "$data_name"] }
+                }
+            },
+            {
+                $addFields: {
+                    cleanTaskName: { $concat: ["$taskIdStr", " - ", "$rawTaskName"] }
                 }
             },
             {
                 $group: {
-                    _id: { topLevel: groupByField, taskName: "$cleanTaskName" },
+                    _id: { topLevel: groupByField, subLevel: subGroupField },
                     taskFailCount: { $sum: 1 },
                     videos: {
                         $push: {
                             dataName: "$cleanDataName", 
                             description: "$description",
-                            producer: "$producer"
+                            producer: "$producer" 
                         }
                     }
                 }
             },
-            // OPTIMIZATION: Max 50 videos per task to prevent UI freezing
             {
                 $project: {
                     topLevel: "$_id.topLevel",
-                    taskName: "$_id.taskName",
+                    subLevel: "$_id.subLevel",
                     taskFailCount: 1,
                     videos: { $slice: ["$videos", 50] } 
                 }
             },
+            // --- NEW: Forces sub-levels (Reasons) to be sorted by highest failure count ---
+            { $sort: { taskFailCount: -1 } },
             {
                 $group: {
                     _id: "$topLevel",
                     totalFailures: { $sum: "$taskFailCount" },
                     tasks: {
                         $push: {
-                            taskName: "$taskName",
+                            taskName: "$subLevel", 
                             failCount: "$taskFailCount",
                             videos: "$videos"
                         }
                     }
                 }
             },
+            // Sorts the Top Levels by highest failure count
             { $sort: { totalFailures: -1 } },
+            { $limit: 100 },
             {
                 $project: {
                     title: { $ifNull: ["$_id", "Unknown"] },
@@ -297,25 +307,46 @@ export const getQcDetails = async (req, res) => {
             }
         ]);
 
-        // --- CHUNK C: DYNAMIC EXTRACTION OF REASONS ---
-        const reasonsPromise = AllRecord.distinct("inspect_error_type_en", {
+        // --- CHUNK C: DYNAMIC EXTRACTION OF DROPDOWN OPTIONS ---
+        const reasonsPromise = AllRecord.distinct("inspect_issue_description_en", {
             ...initialMatch,
             inspect_result: 'INSPECT_FAILED'
         });
 
-        // Execute all 3 database queries simultaneously
-        const [statsResult, rejectionTree, rawReasons] = await Promise.all([statsPromise, treePromise, reasonsPromise]);
+        const tasksPromise = AllRecord.aggregate([
+            { $match: { ...initialMatch, inspect_result: 'INSPECT_FAILED' } },
+            {
+                $lookup: {
+                    from: "tasks",
+                    localField: "platform_task_id",
+                    foreignField: "taskId",
+                    as: "taskDetails"
+                }
+            },
+            { $unwind: { path: "$taskDetails", preserveNullAndEmptyArrays: true } },
+            {
+                $group: {
+                    _id: "$platform_task_id",
+                    name: { $first: { $ifNull: ["$taskDetails.taskName", "$task_name", "Unknown Task"] } }
+                }
+            },
+            { $project: { _id: 0, id: "$_id", name: "$name" } }
+        ]);
+
+        const [statsResult, rejectionTree, rawReasons, rawTasks] = await Promise.all([statsPromise, treePromise, reasonsPromise, tasksPromise]);
 
         const stats = statsResult.length > 0 ? statsResult[0] : {
             totalVideos: 0, qcDone: 0, accepted: 0, rejected: 0, waiting: 0
         };
 
         const dynamicReasons = rawReasons.filter(r => r).sort();
+        const dynamicTasks = rawTasks.filter(t => t.id).map(t => ({ id: t.id, name: `${t.id} - ${t.name}` })).sort((a,b) => a.name.localeCompare(b.name));
 
         res.json({
             stats,
             rejectionTree,
-            dynamicReasons
+            dynamicReasons,
+            dynamicTasks
         });
 
     } catch (error) {
