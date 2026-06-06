@@ -6,15 +6,11 @@ export const getDashboardSummary = async (req, res) => {
         const { category, teams, startDate, endDate } = req.query;
         let match = { start_produce_time: { $exists: true, $ne: null } };
 
-        // 1. Filter by Project Category (Office vs House)
-        if (category && category !== 'ALL') {
-            match.project_category = new RegExp(category, 'i');
-        }
+        if (category && category !== 'ALL') match.project_category = new RegExp(category, 'i');
 
-        // 2. Smart Team/Tag/Shift Filtering
         if (teams && teams !== 'ALL') {
             if (teams === '___NONE___') {
-                match.producer = { $in: [] };
+                match.producer = { $in: [] }; 
             } else {
                 const teamArray = teams.split(',');
                 const mappings = await TeamMap.find({ teamName: { $in: teamArray } }).lean();
@@ -22,7 +18,6 @@ export const getDashboardSummary = async (req, res) => {
             }
         }
 
-        // 3. Date Filtering
         if (startDate && endDate) {
             match.start_produce_time = {
                 $gte: new Date(`${startDate}T00:00:00.000Z`),
@@ -30,13 +25,10 @@ export const getDashboardSummary = async (req, res) => {
             };
         }
 
-        const result = await AllRecord.aggregate([
+        // 1. Global Summary Stats
+        const statsPromise = AllRecord.aggregate([
             { $match: match },
-            {
-                $addFields: {
-                    safe_video_duration: { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } }
-                }
-            },
+            { $addFields: { safe_video_duration: { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } } } },
             {
                 $group: {
                     _id: null,
@@ -52,19 +44,53 @@ export const getDashboardSummary = async (req, res) => {
             }
         ]);
 
-        const data = result[0] || {
-            totalCount: 0, totalHours: 0,
-            acceptedCount: 0, acceptedHours: 0,
-            rejectedCount: 0, rejectedHours: 0,
-            pendingCount: 0, pendingHours: 0
+        // 2. Daily Trend (Last 10 Days)
+        const trendPromise = AllRecord.aggregate([
+            { $match: match },
+            { $addFields: { 
+                safe_video_duration: { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } },
+                logical_day: { $dateToString: { format: "%Y-%m-%d", date: { $subtract: [{ $subtract: ["$start_produce_time", 2.5 * 60 * 60 * 1000] }, 6 * 60 * 60 * 1000] } } }
+            }},
+            {
+                $group: {
+                    _id: "$logical_day",
+                    uniqueProducers: { $addToSet: "$producer" }, // <-- NEW: Collects unique producers
+                    totalCount: { $sum: 1 },
+                    totalHours: { $sum: "$safe_video_duration" },
+                    acceptedCount: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_PASSED"] }, 1, 0] } },
+                    acceptedHours: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_PASSED"] }, "$safe_video_duration", 0] } },
+                    rejectedCount: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_FAILED"] }, 1, 0] } },
+                    rejectedHours: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_FAILED"] }, "$safe_video_duration", 0] } },
+                    pendingCount: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_WAITING"] }, 1, 0] } },
+                    pendingHours: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_WAITING"] }, "$safe_video_duration", 0] } }
+                }
+            },
+            { $sort: { _id: -1 } }, 
+            { $limit: 10 } 
+        ]);
+
+        const [statsResult, trendResult] = await Promise.all([statsPromise, trendPromise]);
+
+        const data = statsResult[0] || {
+            totalCount: 0, totalHours: 0, acceptedCount: 0, acceptedHours: 0,
+            rejectedCount: 0, rejectedHours: 0, pendingCount: 0, pendingHours: 0
         };
 
-        // Note: Returning hours by dividing seconds by 3600
+        const formattedTrend = trendResult.map(day => ({
+            date: day._id,
+            activeProducers: day.uniqueProducers ? day.uniqueProducers.length : 0, // <-- NEW: Count the array length
+            total: { count: day.totalCount, hours: day.totalHours / 3600 },
+            accepted: { count: day.acceptedCount, hours: day.acceptedHours / 3600 },
+            rejected: { count: day.rejectedCount, hours: day.rejectedHours / 3600 },
+            pending: { count: day.pendingCount, hours: day.pendingHours / 3600 }
+        }));
+
         res.json({
             total: { count: data.totalCount, hours: data.totalHours / 3600 },
             accepted: { count: data.acceptedCount, hours: data.acceptedHours / 3600 },
             rejected: { count: data.rejectedCount, hours: data.rejectedHours / 3600 },
-            pending: { count: data.pendingCount, hours: data.pendingHours / 3600 }
+            pending: { count: data.pendingCount, hours: data.pendingHours / 3600 },
+            trend: formattedTrend
         });
     } catch (err) {
         console.error("Project Summary Error:", err);
@@ -73,88 +99,85 @@ export const getDashboardSummary = async (req, res) => {
 };
 
 export const getProducerHistory = async (req, res) => {
-    const { username } = req.params;
-    const { category, startDate, endDate } = req.query;
-
     try {
-        const teamMap = await TeamMap.findOne({ username });
-        const teamName = teamMap ? teamMap.teamName : 'Unassigned';
+        const { username } = req.params;
+        const { category, startDate, endDate } = req.query;
 
-        const filter = { producer: username };
-        if (category && category !== 'ALL') filter.project_category = category;
+        // Base match for the specific producer
+        let match = { producer: username, start_produce_time: { $exists: true, $ne: null } };
+
+        if (category && category !== 'ALL') {
+            match.project_category = new RegExp(category, 'i');
+        }
 
         if (startDate && endDate) {
-            filter.start_produce_time = {
+            match.start_produce_time = {
                 $gte: new Date(`${startDate}T00:00:00.000Z`),
                 $lte: new Date(`${endDate}T23:59:59.999Z`)
             };
         }
 
-        const taskGroups = await AllRecord.aggregate([
-            { $match: filter },
-            {
-                $group: {
-                    _id: "$platform_task_id",
-                    originalTaskName: { $first: "$task_name" }, // Save original in case of missing DB match
-                    totalVideos: { $sum: 1 },
-                    totalSec: { $sum: { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } } },
-                    acceptedSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_PASSED"] }, { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } }, 0] } },
-                    waitingSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_WAITING"] }, { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } }, 0] } },
-                    rejectedSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_FAILED"] }, { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } }, 0] } },
-                    passedVideos: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_PASSED"] }, 1, 0] } },
-                    failedVideos: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_FAILED"] }, 1, 0] } },
-                    waitingVideos: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_WAITING"] }, 1, 0] } }
-                }
-            },
-            // 1. Join with the tasks collection
+        // Fetch team mapping for the UI banner
+        const teamMapping = await TeamMap.findOne({ username }).lean();
+        const teamName = teamMapping ? teamMapping.teamName : 'Unassigned';
+
+        // 1. Get Top-Level Stats for the Producer
+        const statsPromise = AllRecord.aggregate([
+            { $match: match },
+            { $addFields: { safe_duration: { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } } } },
+            { $group: {
+                _id: null,
+                totalSec: { $sum: "$safe_duration" },
+                acceptedSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_PASSED"] }, "$safe_duration", 0] } },
+                rejectedSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_FAILED"] }, "$safe_duration", 0] } },
+                waitingSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_WAITING"] }, "$safe_duration", 0] } }
+            }}
+        ]);
+
+        // 2. Break down stats by Task (Combining Task ID and Task Name via Lookup)
+        const tasksPromise = AllRecord.aggregate([
+            { $match: match },
             {
                 $lookup: {
-                    from: "tasks", // MongoDB automatically lowercases & pluralizes 'Task' to 'tasks'
-                    localField: "_id", // The platform_task_id from the group stage
-                    foreignField: "taskId", // The field in your new Task model
+                    from: "tasks",
+                    localField: "platform_task_id",
+                    foreignField: "taskId",
                     as: "taskDetails"
                 }
             },
-            // 2. Deconstruct the array returned by $lookup
-            {
-                $unwind: {
-                    path: "$taskDetails",
-                    preserveNullAndEmptyArrays: true // Keep records even if the task isn't in the DB yet
-                }
-            },
-            // 3. Overwrite the taskName with the English DB name, fallback to original if null
-            {
-                $addFields: {
-                    taskName: { $ifNull: ["$taskDetails.taskName", "$originalTaskName"] }
-                }
-            },
-            // 4. Clean up the final object payload
-            {
-                $project: {
-                    taskDetails: 0,
-                    originalTaskName: 0
-                }
-            },
-            { $sort: { totalSec: -1 } }
+            { $unwind: { path: "$taskDetails", preserveNullAndEmptyArrays: true } },
+            { $addFields: { 
+                safe_duration: { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } },
+                taskName: { $ifNull: ["$taskDetails.taskName", "$task_name", "Unknown"] },
+                taskId: { $ifNull: ["$platform_task_id", "No-ID"] }
+            }},
+            { $group: {
+                _id: "$taskId",
+                taskName: { $first: "$taskName" },
+                totalVideos: { $sum: 1 },
+                totalSec: { $sum: "$safe_duration" },
+                passedVideos: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_PASSED"] }, 1, 0] } },
+                passedSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_PASSED"] }, "$safe_duration", 0] } },
+                failedVideos: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_FAILED"] }, 1, 0] } },
+                failedSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_FAILED"] }, "$safe_duration", 0] } },
+                waitingVideos: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_WAITING"] }, 1, 0] } },
+                waitingSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_WAITING"] }, "$safe_duration", 0] } }
+            }},
+            { $sort: { totalSec: -1 } } // Sort tasks by most time spent
         ]);
 
-        let totalSec = 0, acceptedSec = 0, rejectedSec = 0, waitingSec = 0;
-
-        taskGroups.forEach(group => {
-            totalSec += group.totalSec;
-            acceptedSec += group.acceptedSec;
-            waitingSec += group.waitingSec;
-            rejectedSec += group.rejectedSec;
-        });
+        const [statsRes, tasks] = await Promise.all([statsPromise, tasksPromise]);
+        
+        const stats = statsRes[0] || { totalSec: 0, acceptedSec: 0, rejectedSec: 0, waitingSec: 0 };
 
         res.json({
-            username,
             teamName,
-            stats: { totalSec, acceptedSec, rejectedSec, waitingSec },
-            tasks: taskGroups
+            stats,
+            tasks
         });
 
     } catch (error) {
+        console.error("Producer Analytics Error:", error);
         res.status(500).json({ error: error.message });
     }
 };

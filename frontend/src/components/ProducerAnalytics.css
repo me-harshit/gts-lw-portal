@@ -1,0 +1,72 @@
+/* ProducerAnalytics.css */
+
+.producer-analytics-container {
+    animation: fadeIn 0.3s ease-out;
+}
+
+.producer-stats-banner {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+    background: var(--bg-secondary);
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    flex-wrap: wrap;
+}
+
+.producer-stat-block {
+    flex: 1;
+    min-width: 120px;
+}
+
+.producer-stat-block:not(:first-child) {
+    border-left: 1px solid var(--border-color);
+    padding-left: 16px;
+}
+
+.stat-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.stat-primary-val {
+    font-size: 15px;
+    font-weight: 600;
+    margin-top: 4px;
+}
+
+.stat-secondary-val {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    font-weight: 500;
+}
+
+/* Empty State Styling */
+.empty-producer-state {
+    padding: 80px 20px;
+    text-align: center;
+    border: 1px dashed var(--border-color);
+    border-radius: 12px;
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+    margin-top: 20px;
+}
+
+.empty-producer-state h3 {
+    margin: 16px 0 8px 0;
+    color: var(--text-main);
+    font-size: 18px;
+}
+
+.empty-producer-state p {
+    margin: 0;
+    font-size: 14px;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+}

@@ -14,6 +14,7 @@ import {
   BarChart3,
   ClipboardCheck,
   Cog,
+  ListChecks 
 } from 'lucide-react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -82,6 +83,16 @@ export default function Sidebar() {
             <Activity size={18} className="nav-icon" />
             <span>Project Dashboard</span>
           </button>
+
+          {/* --- NEW BUTTON HERE --- */}
+          <button
+            className={`nav-button ${isActive('/producer-analytics') ? 'active' : ''}`}
+            onClick={() => navigate('/producer-analytics')}
+          >
+            <ListChecks size={18} className="nav-icon" />
+            <span>Producer Analytics</span>
+          </button>
+          {/* ----------------------- */}
 
           <button
             className={`nav-button ${isActive('/leaderboard') ? 'active' : ''}`}
