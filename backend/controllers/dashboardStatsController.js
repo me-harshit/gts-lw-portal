@@ -14,7 +14,7 @@ export const getDashboardSummary = async (req, res) => {
         // 2. Smart Team/Tag/Shift Filtering
         if (teams && teams !== 'ALL') {
             if (teams === '___NONE___') {
-                match.producer = { $in: [] }; 
+                match.producer = { $in: [] };
             } else {
                 const teamArray = teams.split(',');
                 const mappings = await TeamMap.find({ teamName: { $in: teamArray } }).lean();
@@ -169,7 +169,7 @@ export const getQcDetails = async (req, res) => {
         // 1. Smart Team Filter via TeamMap
         if (teams && teams !== 'ALL') {
             if (teams === '___NONE___') {
-                initialMatch.producer = { $in: [] }; 
+                initialMatch.producer = { $in: [] };
             } else {
                 const teamArray = teams.split(',');
                 const mappings = await TeamMap.find({ teamName: { $in: teamArray } }).lean();
@@ -216,7 +216,7 @@ export const getQcDetails = async (req, res) => {
 
         // --- CHUNK B: NESTED REJECTION TREE ---
         const treeMatch = { ...initialMatch, inspect_result: 'INSPECT_FAILED' };
-        
+
         if (viewMode === 'BY_PRODUCER' && producer && producer !== 'ALL') treeMatch.producer = producer;
         else if (viewMode === 'BY_REASON' && reason && reason !== 'ALL') treeMatch.inspect_issue_description_en = reason;
         else if (viewMode === 'BY_TASK' && taskId && taskId !== 'ALL') treeMatch.platform_task_id = taskId;
@@ -228,7 +228,7 @@ export const getQcDetails = async (req, res) => {
         } else if (viewMode === 'BY_TASK') {
             groupByField = "$cleanTaskName";
             subGroupField = "$reason"; // Show reason as sub-level for tasks
-        } else { 
+        } else {
             groupByField = "$producer";
             subGroupField = "$cleanTaskName";
         }
@@ -248,7 +248,7 @@ export const getQcDetails = async (req, res) => {
                 $addFields: {
                     rawTaskName: { $ifNull: ["$taskDetails.taskName", "$task_name", "Unknown Task"] },
                     taskIdStr: { $ifNull: ["$platform_task_id", "No-ID"] },
-                    reason: { $ifNull: ["$inspect_issue_description_en", "$inspect_issue_description", "Unspecified Reason"] }, 
+                    reason: { $ifNull: ["$inspect_issue_description_en", "$inspect_issue_description", "Unspecified Reason"] },
                     description: { $ifNull: ["$inspect_issue_description", "No description provided."] }, // Fallback to original
                     cleanDataName: { $ifNull: ["$data_name_en", "$data_name"] }
                 }
@@ -264,9 +264,9 @@ export const getQcDetails = async (req, res) => {
                     taskFailCount: { $sum: 1 },
                     videos: {
                         $push: {
-                            dataName: "$cleanDataName", 
+                            dataName: "$cleanDataName",
                             description: "$description",
-                            producer: "$producer" 
+                            producer: "$producer"
                         }
                     }
                 }
@@ -276,7 +276,7 @@ export const getQcDetails = async (req, res) => {
                     topLevel: "$_id.topLevel",
                     subLevel: "$_id.subLevel",
                     taskFailCount: 1,
-                    videos: { $slice: ["$videos", 50] } 
+                    videos: { $slice: ["$videos", 50] }
                 }
             },
             // --- NEW: Forces sub-levels (Reasons) to be sorted by highest failure count ---
@@ -287,7 +287,7 @@ export const getQcDetails = async (req, res) => {
                     totalFailures: { $sum: "$taskFailCount" },
                     tasks: {
                         $push: {
-                            taskName: "$subLevel", 
+                            taskName: "$subLevel",
                             failCount: "$taskFailCount",
                             videos: "$videos"
                         }
@@ -340,7 +340,7 @@ export const getQcDetails = async (req, res) => {
         };
 
         const dynamicReasons = rawReasons.filter(r => r).sort();
-        const dynamicTasks = rawTasks.filter(t => t.id).map(t => ({ id: t.id, name: `${t.id} - ${t.name}` })).sort((a,b) => a.name.localeCompare(b.name));
+        const dynamicTasks = rawTasks.filter(t => t.id).map(t => ({ id: t.id, name: `${t.id} - ${t.name}` })).sort((a, b) => a.name.localeCompare(b.name));
 
         res.json({
             stats,

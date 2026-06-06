@@ -30,6 +30,7 @@ export const login = async (req, res) => {
         });
 
         // 5. Send user data back (EXCEPT password)
+        // Ensure your React Login component saves this to localStorage!
         res.status(200).json({ username: user.username, role: user.role });
 
     } catch (error) {

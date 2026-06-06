@@ -13,10 +13,10 @@ if (!fs.existsSync(BACKUP_DIR)) {
 export const createBackup = async (req, res) => {
     try {
         console.log("💾 [Backup Engine] Starting local database snapshot...");
-        
+
         // Fetch all records as plain JavaScript objects to save RAM
         const allData = await AllRecord.find({}).lean();
-        
+
         if (!allData || allData.length === 0) {
             return res.status(404).json({ message: "No data found to backup." });
         }
@@ -35,9 +35,9 @@ export const createBackup = async (req, res) => {
         const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);
 
         console.log(`✅ [Backup Engine] Success: ${fileName} (${fileSizeMB} MB)`);
-        
-        res.status(200).json({ 
-            message: "Backup created successfully", 
+
+        res.status(200).json({
+            message: "Backup created successfully",
             fileName,
             size: `${fileSizeMB} MB`,
             recordCount: allData.length
@@ -76,41 +76,37 @@ export const exportAllRecordsCsv = async (req, res) => {
     try {
         console.log("📊 [Export Engine] Starting fast CSV stream...");
 
-        // Tell the browser this is a file download immediately
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename=GTS_Records_${new Date().toISOString().split('T')[0]}.csv`);
 
-        // Grab just ONE record to instantly generate the headers
         const firstRecord = await AllRecord.findOne().lean();
         if (!firstRecord) {
             return res.status(404).send("No records found in database.");
         }
 
-        // Filter out internal MongoDB fields
         const headers = Object.keys(firstRecord).filter(key => key !== '_id' && key !== '__v');
 
-        // Write the header row directly to the output stream
+        // 👇 --- THIS IS THE MAGIC FIX --- 👇
+        // Adds the UTF-8 Byte Order Mark (BOM) so Excel reads Chinese characters perfectly
+        res.write('\uFEFF');
+        // 👆 ---------------------------- 👆
+
         res.write(headers.join(',') + '\n');
 
-        // Create a MongoDB cursor to stream data in small batches (Prevents RAM overload)
         const cursor = AllRecord.find({}).lean().cursor({ batchSize: 500 });
 
-        // As data streams in, format it and pipe it instantly to the user's browser
         cursor.on('data', (doc) => {
             const rowData = headers.map(header => {
                 let cellData = doc[header];
                 if (cellData === null || cellData === undefined) return '""';
-                
-                // Escape existing quotes and wrap in quotes to handle commas safely
+
                 cellData = cellData.toString().replace(/"/g, '""');
                 return `"${cellData}"`;
             });
-            
-            // Push chunk to browser
+
             res.write(rowData.join(',') + '\n');
         });
 
-        // When the database finishes sending data, close the stream
         cursor.on('end', () => {
             console.log("✅ [Export Engine] Fast CSV stream complete.");
             res.end();

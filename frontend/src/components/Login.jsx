@@ -20,13 +20,23 @@ export default function Login() {
         setShake(false);
 
         try {
-            const res = await axios.post(`${API_URL}/api/auth/login`, { username, password });
+            // withCredentials is required for httpOnly cookies to save in the browser
+            const res = await axios.post(`${API_URL}/api/auth/login`,
+                { username, password },
+                { withCredentials: true }
+            );
+
+            // FIX 1: Save the user info
             localStorage.setItem('user', JSON.stringify(res.data));
-            window.location.href = '/tasks'; // Fast redirect
+
+            // FIX 2: Save the 'token' key so ProtectedRoute knows you are logged in
+            localStorage.setItem('token', 'true');
+
+            window.location.href = '/tasks';
         } catch (err) {
-            setError(err.response?.data?.message || 'Login failed. Please try again.');
-            setShake(true); // Trigger shake animation
-            setTimeout(() => setShake(false), 400); // Reset shake class after animation
+            setError(err.response?.data?.message || 'Login failed.');
+            setShake(true);
+            setTimeout(() => setShake(false), 400);
         } finally {
             setLoading(false);
         }
@@ -42,26 +52,26 @@ export default function Login() {
                     <h2>GTS Portal Login</h2>
                     <p>Enter your credentials to continue</p>
                 </div>
-                
+
                 <form onSubmit={handleLogin} className="login-form">
                     <div className="input-group">
-                        <input 
-                            type="email" 
-                            placeholder="Email address" 
+                        <input
+                            type="email"
+                            placeholder="Email address"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
-                            required 
+                            required
                         />
                         <Mail className="input-icon" size={18} />
                     </div>
-                    
+
                     <div className="input-group">
-                        <input 
-                            type="password" 
-                            placeholder="Password" 
+                        <input
+                            type="password"
+                            placeholder="Password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            required 
+                            required
                         />
                         <Lock className="input-icon" size={18} />
                     </div>

@@ -85,3 +85,80 @@ body.dark-mode .sidebar {
 .nav-icon {
   transition: color 0.3s ease;
 }
+
+
+/* =========================================
+   SIDEBAR SECTION
+========================================= */
+.sidebar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 28px;
+}
+
+/* =========================================
+   SIDEBAR HEADINGS
+========================================= */
+.sidebar-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  padding: 0 12px 10px 12px;
+  margin-bottom: 6px;
+
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+
+  color: var(--text-muted);
+
+  border-bottom: 1px solid var(--border-color);
+
+  opacity: 0.9;
+}
+
+/* Make heading icons perfectly aligned */
+.sidebar-title svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+
+/* =========================================
+   NAVIGATION BUTTONS
+========================================= */
+.nav-button {
+  background: transparent;
+  border: none;
+
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  text-align: left;
+
+  padding: 12px 14px;
+  border-radius: var(--radius-md, 12px);
+
+  color: var(--text-muted);
+
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+
+  cursor: pointer;
+
+  transition: all 0.25s ease;
+}
+
+.nav-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
