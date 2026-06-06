@@ -60,9 +60,17 @@ export default function ProjectDashboard() {
     const [teams, setTeams] = useState([]);
     const [teamConfigs, setTeamConfigs] = useState([]);
 
+    // Corrected Math to convert decimal hours to XXh YYmin
     const formatDecimalHours = (decimalHours) => {
-        if (decimalHours === undefined || decimalHours === null || isNaN(decimalHours)) return '--h';
-        return `${decimalHours.toFixed(1)}h`;
+        if (!decimalHours || isNaN(decimalHours) || decimalHours === 0) return '0h 0min';
+        
+        const hrs = Math.floor(decimalHours);
+        const mins = Math.round((decimalHours - hrs) * 60);
+        
+        // Handle edge case where rounding pushes minutes to 60
+        if (mins === 60) return `${hrs + 1}h 0min`;
+        
+        return `${hrs}h ${mins}m`;
     };
 
     const applyQuickFilter = (type) => {
@@ -214,7 +222,6 @@ export default function ProjectDashboard() {
                 </div>
             </div>
 
-            {/* --- DAILY SUMMARY TABLE --- */}
             <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '40px 0 24px 0' }} />
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>

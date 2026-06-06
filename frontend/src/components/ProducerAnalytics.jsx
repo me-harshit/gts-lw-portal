@@ -1,14 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useQuery } from '@tanstack/react-query';
-import { Filter, Calendar, User, ListChecks, Search, ChevronDown, Loader2 } from 'lucide-react';
-import { formatDuration } from '../utils/timeFormat';
+import { Filter, Calendar, Users, ChevronDown, Activity, Loader2, Tag as TagIcon, Clock, TrendingUp } from 'lucide-react';
 import './TaskDashboard.css';
-import './ProducerAnalytics.css'; 
+import './ProjectDashboard.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder, containerStyle }) => {
+const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder, className }) => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
 
@@ -23,15 +22,13 @@ const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder, conta
     const selectedLabel = options.find(o => o.value === value)?.label || placeholder;
 
     return (
-        <div className="searchable-dropdown-container" style={containerStyle || { width: 'auto', minWidth: '160px' }} ref={dropdownRef}>
-            <div className="searchable-dropdown-header" onClick={() => setIsOpen(!isOpen)} style={{ height: '100%', width: '100%' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
-                    {Icon && <Icon size={16} color="var(--text-muted)" style={{ flexShrink: 0 }} />}
-                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', width: '100%' }}>
-                        {selectedLabel}
-                    </span>
+        <div className={`searchable-dropdown-container ${className || ''}`} ref={dropdownRef}>
+            <div className="searchable-dropdown-header" onClick={() => setIsOpen(!isOpen)}>
+                <div className="searchable-dropdown-header-content">
+                    {Icon && <Icon size={16} className="searchable-dropdown-icon" />}
+                    <span className="searchable-dropdown-text">{selectedLabel}</span>
                 </div>
-                <ChevronDown size={16} color="var(--text-muted)" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s', flexShrink: 0 }} />
+                <ChevronDown size={16} className={`searchable-dropdown-caret ${isOpen ? 'open' : ''}`} />
             </div>
             {isOpen && (
                 <div className="searchable-dropdown-menu">
@@ -48,243 +45,246 @@ const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder, conta
     );
 };
 
-export default function ProducerAnalytics() {
+export default function ProjectDashboard() {
     const [viewCategory, setViewCategory] = useState('ALL');
-    const [prodStartDate, setProdStartDate] = useState('');
-    const [prodEndDate, setProdEndDate] = useState('');
-    const [activeProdFilter, setActiveProdFilter] = useState('allTime');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [activeGlobalFilter, setActiveGlobalFilter] = useState('allTime');
 
-    const [userMappings, setUserMappings] = useState([]);
-    const [selectedProducer, setSelectedProducer] = useState(null);
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const [producerSearch, setProducerSearch] = useState('');
-    const dropdownRef = useRef(null);
+    const [activeTag, setActiveTag] = useState('ALL');
+    const [activeShift, setActiveShift] = useState('ALL');
+    const [teamCategory, setTeamCategory] = useState('ALL');
+
+    const [tags, setTags] = useState([]);
+    const [shifts, setShifts] = useState([]);
+    const [teams, setTeams] = useState([]);
+    const [teamConfigs, setTeamConfigs] = useState([]);
+
+    // Format Decimal Hours to exact Hours & Minutes
+    const formatDecimalHours = (decimalHours) => {
+        if (decimalHours === undefined || decimalHours === null || isNaN(decimalHours)) return '--h --m';
+        const hrs = Math.floor(decimalHours);
+        const mins = Math.round((decimalHours - hrs) * 60);
+        return `${hrs}h ${mins}m`;
+    };
 
     const applyQuickFilter = (type) => {
-        setActiveProdFilter(type);
+        setActiveGlobalFilter(type);
         const today = new Date();
         const formatDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
-        if (type === 'today') { setProdStartDate(formatDate(today)); setProdEndDate(formatDate(today)); } 
-        else if (type === 'yesterday') { const y = new Date(today); y.setDate(y.getDate() - 1); setProdStartDate(formatDate(y)); setProdEndDate(formatDate(y)); } 
-        else if (type === 'thisWeek') { const m = new Date(today); m.setDate(m.getDate() - (m.getDay() || 7) + 1); setProdStartDate(formatDate(m)); setProdEndDate(formatDate(today)); } 
-        else if (type === 'thisMonth') { setProdStartDate(formatDate(new Date(today.getFullYear(), today.getMonth(), 1))); setProdEndDate(formatDate(today)); } 
-        else { setProdStartDate(''); setProdEndDate(''); }
+        if (type === 'today') { setStartDate(formatDate(today)); setEndDate(formatDate(today)); } 
+        else if (type === 'yesterday') { const y = new Date(today); y.setDate(y.getDate() - 1); setStartDate(formatDate(y)); setEndDate(formatDate(y)); } 
+        else if (type === 'thisWeek') { const m = new Date(today); m.setDate(m.getDate() - (m.getDay() || 7) + 1); setStartDate(formatDate(m)); setEndDate(formatDate(today)); } 
+        else if (type === 'thisMonth') { setStartDate(formatDate(new Date(today.getFullYear(), today.getMonth(), 1))); setEndDate(formatDate(today)); } 
+        else { setStartDate(''); setEndDate(''); }
     };
 
     const handleDateChange = (value, isStart) => {
-        setActiveProdFilter('');
-        isStart ? setProdStartDate(value) : setProdEndDate(value);
+        setActiveGlobalFilter('');
+        isStart ? setStartDate(value) : setEndDate(value);
     };
 
     useEffect(() => {
-        const fetchMeta = async () => {
+        const fetchMetadata = async () => {
             try {
-                const res = await axios.get(`${API_URL}/api/teams`);
-                setUserMappings(res.data);
+                const [configsRes, tagsRes, shiftsRes] = await Promise.all([
+                    axios.get(`${API_URL}/api/teams/configs`),
+                    axios.get(`${API_URL}/api/teams/tags`),
+                    axios.get(`${API_URL}/api/teams/shifts`)
+                ]);
+                setTeamConfigs(configsRes.data);
+                setTags(tagsRes.data.map(t => t.name));
+                setShifts(shiftsRes.data.map(s => s.name));
+                setTeams(Array.from(new Set(configsRes.data.map(c => c.name))));
             } catch (error) { console.error("Failed to load metadata", error); }
         };
-        fetchMeta();
+        fetchMetadata();
     }, []);
 
-    const { data: producerData, isFetching: isFetchingProducer } = useQuery({
-        queryKey: ['producerHistory', selectedProducer?.username, viewCategory, prodStartDate, prodEndDate],
+    let matchingTeams = teamConfigs;
+    if (activeTag !== 'ALL') matchingTeams = matchingTeams.filter(t => t.tag === activeTag);
+    if (activeShift !== 'ALL') matchingTeams = matchingTeams.filter(t => t.timingSlot === activeShift);
+    if (teamCategory !== 'ALL') matchingTeams = matchingTeams.filter(t => t.name === teamCategory);
+
+    let teamQuery = 'ALL';
+    if ((activeTag !== 'ALL' || activeShift !== 'ALL' || teamCategory !== 'ALL') && matchingTeams.length === 0) teamQuery = '___NONE___'; 
+    else if (activeTag !== 'ALL' || activeShift !== 'ALL' || teamCategory !== 'ALL') teamQuery = matchingTeams.map(t => t.name).join(',');
+
+    const { data: summary, isFetching } = useQuery({
+        queryKey: ['projectSummary', viewCategory, teamQuery, startDate, endDate, teamConfigs.length],
         queryFn: async () => {
-            if (!selectedProducer) return null;
-            let url = `${API_URL}/api/dashboard/stats/producer/${selectedProducer.username}?category=${viewCategory}`;
-            if (prodStartDate && prodEndDate) url += `&startDate=${prodStartDate}&endDate=${prodEndDate}`;
+            let url = `${API_URL}/api/dashboard/stats/summary?category=${viewCategory}&teams=${teamQuery}`;
+            if (startDate && endDate) url += `&startDate=${startDate}&endDate=${endDate}`;
             const res = await axios.get(url);
             return res.data;
         },
-        enabled: !!selectedProducer,
-        refetchOnWindowFocus: false
+        placeholderData: (prev) => prev,
+        refetchOnWindowFocus: false,
+        enabled: teamConfigs.length > 0
     });
 
-    const filteredProducers = userMappings.filter(p => p.username.toLowerCase().includes(producerSearch.toLowerCase()));
+    const totalCount = summary?.total?.count || 0;
+    const acceptedCount = summary?.accepted?.count || 0;
+    const rejectedCount = summary?.rejected?.count || 0;
+    const pendingCount = summary?.pending?.count || 0;
+
+    const totalHours = summary?.total?.hours || 0;
+    const acceptedHours = summary?.accepted?.hours || 0;
+    const rejectedHours = summary?.rejected?.hours || 0;
+    const pendingHours = summary?.pending?.hours || 0;
+
+    const inspectedCount = acceptedCount + rejectedCount;
+    const inspectedHours = acceptedHours + rejectedHours;
+
+    const acceptanceRate = inspectedHours > 0 ? ((acceptedHours / inspectedHours) * 100).toFixed(1) : '0.0';
+    const rejectionRate = inspectedHours > 0 ? ((rejectedHours / inspectedHours) * 100).toFixed(1) : '0.0';
+    const pendingRate = totalHours > 0 ? ((pendingHours / totalHours) * 100).toFixed(1) : '0.0';
+    const inspectedRate = totalHours > 0 ? ((inspectedHours / totalHours) * 100).toFixed(1) : '0.0';
 
     return (
-        <div className="dashboard-card producer-analytics-container" style={{ maxWidth: '1400px', margin: '0 auto' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '32px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-                    <h2 className="dashboard-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'var(--primary)' }}>
-                        <ListChecks size={28} /> Producer Analytics
+        <div className="dashboard-card pd-container">
+            <div className="pd-header-section">
+                <div className="pd-header-row">
+                    <h2 className="dashboard-header pd-title">
+                        <Activity className="pd-icon-primary" size={24} />
+                        Project Overview
                     </h2>
-                    <div className="quick-filters-container" style={{ margin: 0 }}>
-                        <button className={`quick-filter-btn ${activeProdFilter === 'allTime' ? 'active' : ''}`} onClick={() => applyQuickFilter('allTime')}>All Time</button>
-                        <button className={`quick-filter-btn ${activeProdFilter === 'today' ? 'active' : ''}`} onClick={() => applyQuickFilter('today')}>Today</button>
-                        <button className={`quick-filter-btn ${activeProdFilter === 'yesterday' ? 'active' : ''}`} onClick={() => applyQuickFilter('yesterday')}>Yesterday</button>
-                        <button className={`quick-filter-btn ${activeProdFilter === 'thisWeek' ? 'active' : ''}`} onClick={() => applyQuickFilter('thisWeek')}>This Week</button>
-                        <button className={`quick-filter-btn ${activeProdFilter === 'thisMonth' ? 'active' : ''}`} onClick={() => applyQuickFilter('thisMonth')}>This Month</button>
+                    <div className="quick-filters-container pd-no-margin">
+                        <button className={`quick-filter-btn ${activeGlobalFilter === 'allTime' ? 'active' : ''}`} onClick={() => applyQuickFilter('allTime')}>All Time</button>
+                        <button className={`quick-filter-btn ${activeGlobalFilter === 'today' ? 'active' : ''}`} onClick={() => applyQuickFilter('today')}>Today</button>
+                        <button className={`quick-filter-btn ${activeGlobalFilter === 'yesterday' ? 'active' : ''}`} onClick={() => applyQuickFilter('yesterday')}>Yesterday</button>
+                        <button className={`quick-filter-btn ${activeGlobalFilter === 'thisWeek' ? 'active' : ''}`} onClick={() => applyQuickFilter('thisWeek')}>This Week</button>
+                        <button className={`quick-filter-btn ${activeGlobalFilter === 'thisMonth' ? 'active' : ''}`} onClick={() => applyQuickFilter('thisMonth')}>This Month</button>
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <CustomSelect
-                        icon={Filter}
-                        value={viewCategory}
-                        onChange={setViewCategory}
-                        options={[
-                            { value: 'ALL', label: 'All Projects' },
-                            { value: 'OFFICE', label: 'Office Tasks' },
-                            { value: 'HOUSE', label: 'House Tasks' }
-                        ]}
-                        containerStyle={{ width: '180px', height: '40px' }} 
-                    />
+                <div className="pd-filter-row">
+                    <CustomSelect className="pd-select-sm" icon={TagIcon} value={activeTag} onChange={setActiveTag} options={[{ value: 'ALL', label: 'All Tags' }, ...tags.map(t => ({ value: t, label: t }))]} />
+                    <CustomSelect className="pd-select-md" icon={Clock} value={activeShift} onChange={setActiveShift} options={[{ value: 'ALL', label: 'All Shifts' }, ...shifts.map(s => ({ value: s, label: s }))]} />
+                    <CustomSelect className="pd-select-sm" icon={Users} value={teamCategory} onChange={setTeamCategory} options={[{ value: 'ALL', label: 'All Teams' }, ...teams.map(t => ({ value: t, label: t }))]} />
+                    <CustomSelect className="pd-select-sm" icon={Filter} value={viewCategory} onChange={setViewCategory} options={[{ value: 'ALL', label: 'All Projects' }, { value: 'OFFICE', label: 'Office Tasks' }, { value: 'HOUSE', label: 'House Tasks' }]} />
 
-                    <div className="searchable-dropdown-header" style={{ cursor: 'default', height: '40px' }}>
-                        <Calendar size={16} color="var(--text-muted)" />
-                        <input type="date" value={prodStartDate} onChange={(e) => handleDateChange(e.target.value, true)} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none', paddingLeft: '8px' }} />
-                        <span style={{ color: 'var(--text-muted)', margin: '0 8px' }}>to</span>
-                        <input type="date" value={prodEndDate} onChange={(e) => handleDateChange(e.target.value, false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none' }} />
-                    </div>
-
-                    <div className="searchable-dropdown-container" style={{ width: '100%', maxWidth: '350px' }} ref={dropdownRef}>
-                        <div className="searchable-dropdown-header" onClick={() => setIsDropdownOpen(!isDropdownOpen)} style={{ height: '40px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <User size={16} color="var(--text-muted)" />
-                                <span>{selectedProducer ? selectedProducer.username : '-- Search Specific Producer --'}</span>
-                            </div>
-                            <ChevronDown size={16} color="var(--text-muted)" style={{ transform: isDropdownOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }} />
-                        </div>
-
-                        {isDropdownOpen && (
-                            <div className="searchable-dropdown-menu">
-                                <div className="searchable-dropdown-search">
-                                    <Search size={14} className="searchable-dropdown-search-icon" />
-                                    <input type="text" placeholder="Search by username..." value={producerSearch} onChange={(e) => setProducerSearch(e.target.value)} autoFocus />
-                                </div>
-                                <ul className="searchable-dropdown-list">
-                                    {filteredProducers.length > 0 ? (
-                                        filteredProducers.map(p => (
-                                            <li key={p.username} className={`searchable-dropdown-item ${selectedProducer?.username === p.username ? 'active' : ''}`} onClick={() => { setSelectedProducer(p); setIsDropdownOpen(false); setProducerSearch(''); }}>
-                                                <div style={{ fontWeight: '600' }}>{p.username}</div>
-                                                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>Team: {p.teamName}</div>
-                                            </li>
-                                        ))
-                                    ) : (
-                                        <li style={{ padding: '10px 16px', color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center' }}>No producers found</li>
-                                    )}
-                                </ul>
-                            </div>
-                        )}
+                    <div className="qc-filter-wrapper pd-date-wrapper">
+                        <Calendar size={16} className="pd-icon-muted" />
+                        <input type="date" className="pd-date-input" value={startDate} onChange={(e) => handleDateChange(e.target.value, true)} />
+                        <span className="pd-date-separator">to</span>
+                        <input type="date" className="pd-date-input" value={endDate} onChange={(e) => handleDateChange(e.target.value, false)} />
                     </div>
                 </div>
             </div>
 
-            {!selectedProducer ? (
-                <div className="empty-producer-state">
-                    <User size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
-                    <h3>Select a Producer</h3>
-                    <p>Use the dropdown above to view an individual producer's full production history and success rates.</p>
-                </div>
-            ) : (
-                <div style={{ opacity: isFetchingProducer ? 0.6 : 1, transition: 'opacity 0.2s' }}>
-                    {producerData && (
-                        <div className="producer-stats-banner">
-                            {(() => {
-                                const totalVids = producerData.tasks?.reduce((acc, t) => acc + (Number(t.totalVideos) || 0), 0) || 0;
-                                const passedVids = producerData.tasks?.reduce((acc, t) => acc + (Number(t.passedVideos) || Number(t.acceptedVideos) || 0), 0) || 0;
-                                const failedVids = producerData.tasks?.reduce((acc, t) => acc + (Number(t.failedVideos) || Number(t.rejectedVideos) || 0), 0) || 0;
-                                const waitingVids = producerData.tasks?.reduce((acc, t) => acc + (Number(t.waitingVideos) || 0), 0) || 0;
-
-                                return (
-                                    <>
-                                        <div className="producer-stat-block">
-                                            <div className="stat-label">Team</div>
-                                            <div className="stat-primary-val" style={{ color: 'var(--text-main)' }}>{producerData.teamName}</div>
-                                        </div>
-                                        <div className="producer-stat-block">
-                                            <div className="stat-label">Total Volume</div>
-                                            <div className="stat-primary-val" style={{ color: 'var(--primary)' }}>{formatDuration(producerData.stats.totalSec)}</div>
-                                            <div className="stat-secondary-val">{totalVids.toLocaleString()} videos</div>
-                                        </div>
-                                        <div className="producer-stat-block">
-                                            <div className="stat-label">Accepted</div>
-                                            <div className="stat-primary-val" style={{ color: '#10b981' }}>{formatDuration(producerData.stats.acceptedSec)}</div>
-                                            <div className="stat-secondary-val">{passedVids.toLocaleString()} videos</div>
-                                        </div>
-                                        <div className="producer-stat-block">
-                                            <div className="stat-label">Rejected</div>
-                                            <div className="stat-primary-val" style={{ color: '#ef4444' }}>{formatDuration(producerData.stats.rejectedSec)}</div>
-                                            <div className="stat-secondary-val">{failedVids.toLocaleString()} videos</div>
-                                        </div>
-                                        <div className="producer-stat-block">
-                                            <div className="stat-label">Pending QC</div>
-                                            <div className="stat-primary-val" style={{ color: '#f59e0b' }}>{formatDuration(producerData.stats.waitingSec)}</div>
-                                            <div className="stat-secondary-val">{waitingVids.toLocaleString()} videos</div>
-                                        </div>
-                                    </>
-                                );
-                            })()}
-                        </div>
-                    )}
-
-                    <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                            <thead>
-                                <tr>
-                                    <th style={{ padding: '14px 16px', background: 'var(--bg-secondary)', color: 'var(--text-muted)', fontSize: '12px', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)' }}>Task ID & Name</th>
-                                    <th style={{ padding: '14px 16px', background: 'var(--bg-secondary)', color: 'var(--text-muted)', fontSize: '12px', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)', textAlign: 'center' }}>Total Volume</th>
-                                    <th style={{ padding: '14px 16px', background: 'var(--bg-secondary)', color: '#10b981', fontSize: '12px', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)', textAlign: 'center' }}>Passed</th>
-                                    <th style={{ padding: '14px 16px', background: 'var(--bg-secondary)', color: '#ef4444', fontSize: '12px', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)', textAlign: 'center' }}>Failed</th>
-                                    <th style={{ padding: '14px 16px', background: 'var(--bg-secondary)', color: '#f59e0b', fontSize: '12px', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)', textAlign: 'center' }}>Waiting</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {producerData?.tasks?.length > 0 ? (
-                                    producerData.tasks.map(task => {
-                                        // --- FIX: Strictly parsing floats to avoid NaN% ---
-                                        const totalSec = Number(task.totalSec) || 0;
-                                        const safePassedSec = Number(task.passedSec) || Number(task.acceptedSec) || 0;
-                                        const safeFailedSec = Number(task.failedSec) || Number(task.rejectedSec) || 0;
-                                        const safeWaitingSec = Number(task.waitingSec) || 0;
-
-                                        const safeTotalVideos = Number(task.totalVideos) || 0;
-                                        const safePassedVideos = Number(task.passedVideos) || Number(task.acceptedVideos) || 0;
-                                        const safeFailedVideos = Number(task.failedVideos) || Number(task.rejectedVideos) || 0;
-                                        const safeWaitingVideos = Number(task.waitingVideos) || 0;
-
-                                        const passedPct = totalSec > 0 ? Math.round((safePassedSec / totalSec) * 100) : 0;
-                                        const failedPct = totalSec > 0 ? Math.round((safeFailedSec / totalSec) * 100) : 0;
-                                        const waitingPct = totalSec > 0 ? Math.round((safeWaitingSec / totalSec) * 100) : 0;
-
-                                        return (
-                                            <tr key={task._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                                <td style={{ padding: '14px 16px' }}>
-                                                    <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-main)' }}>{task._id || 'Unknown Task ID'}</div>
-                                                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{task.taskName || 'Unknown Task Name'}</div>
-                                                </td>
-                                                <td style={{ padding: '14px 16px', textAlign: 'center' }}>
-                                                    <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-main)' }}>{formatDuration(totalSec)}</div>
-                                                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{safeTotalVideos} videos</div>
-                                                </td>
-                                                <td style={{ padding: '14px 16px', textAlign: 'center' }}>
-                                                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#10b981' }}>{formatDuration(safePassedSec)}</div>
-                                                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{safePassedVideos} vids ({passedPct}%)</div>
-                                                </td>
-                                                <td style={{ padding: '14px 16px', textAlign: 'center' }}>
-                                                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#ef4444' }}>{formatDuration(safeFailedSec)}</div>
-                                                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{safeFailedVideos} vids ({failedPct}%)</div>
-                                                </td>
-                                                <td style={{ padding: '14px 16px', textAlign: 'center' }}>
-                                                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#f59e0b' }}>{formatDuration(safeWaitingSec)}</div>
-                                                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{safeWaitingVideos} vids ({waitingPct}%)</div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
-                                ) : (
-                                    <tr>
-                                        <td colSpan="5" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                                            {isFetchingProducer ? <Loader2 className="spinning" style={{ margin: '0 auto' }} /> : 'No tasks found for this date range.'}
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
+            <div className={`summary-cards pd-summary-wrap ${isFetching ? 'pd-is-fetching' : ''}`}>
+                <div className="summary-card">
+                    <span className="card-title">Total Volume</span>
+                    <div className="pd-summary-content">
+                        <span className="card-value pd-text-primary">{formatDecimalHours(totalHours)}</span>
+                        <span className="pd-summary-subtext">{totalCount.toLocaleString()} clips</span>
                     </div>
                 </div>
-            )}
+                <div className="summary-card">
+                    <span className="card-title">Total Accepted</span>
+                    <div className="pd-summary-content">
+                        <span className="card-value pd-text-success">{formatDecimalHours(acceptedHours)}</span>
+                        <span className="pd-summary-subtext">{acceptedCount.toLocaleString()} clips</span>
+                        {inspectedCount > 0 && <span className="pd-summary-subtext-bold">Acceptance Rate - {acceptanceRate}%</span>}
+                    </div>
+                </div>
+                <div className="summary-card">
+                    <span className="card-title">Total Rejected</span>
+                    <div className="pd-summary-content">
+                        <span className="card-value pd-text-danger">{formatDecimalHours(rejectedHours)}</span>
+                        <span className="pd-summary-subtext">{rejectedCount.toLocaleString()} clips</span>
+                        {inspectedCount > 0 && <span className="pd-summary-subtext-bold">Rejection Rate - {rejectionRate}%</span>}
+                    </div>
+                </div>
+                <div className="summary-card">
+                    <span className="card-title">QC Done</span>
+                    <div className="pd-summary-content">
+                        <span className="card-value pd-text-info">{formatDecimalHours(inspectedHours)}</span>
+                        <span className="pd-summary-subtext">{inspectedCount.toLocaleString()} clips</span>
+                        {totalCount > 0 && <span className="pd-summary-subtext-bold">QC Completed - {inspectedRate}%</span>}
+                    </div>
+                </div>
+                <div className="summary-card">
+                    <span className="card-title">Pending QC</span>
+                    <div className="pd-summary-content">
+                        <span className="card-value pd-text-warning">{formatDecimalHours(pendingHours)}</span>
+                        <span className="pd-summary-subtext">{pendingCount.toLocaleString()} clips</span>
+                        {totalCount > 0 && <span className="pd-summary-subtext-bold">QC Pending - {pendingRate}%</span>}
+                    </div>
+                </div>
+            </div>
+
+            <hr className="pd-divider" />
+            
+            <div className="pd-section-header">
+                <h3 className="pd-section-title">
+                    <TrendingUp size={20} className="pd-icon-primary" />
+                    Daily Production Summary
+                </h3>
+            </div>
+
+            <div className={`pd-table-wrapper ${isFetching ? 'pd-is-fetching' : ''}`}>
+                <table className="pd-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th className="pd-text-center">Active Collectors</th>
+                            <th className="pd-text-center">Hrs Collected</th>
+                            <th className="pd-text-center pd-th-success">QC Pass</th>
+                            <th className="pd-text-center pd-th-danger">QC Fail</th>
+                            <th className="pd-text-center pd-th-warning">QC Pending</th>
+                            <th className="pd-text-center pd-th-main">Pass Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {summary?.trend?.length > 0 ? (
+                            summary.trend.map(day => {
+                                const passRate = day.accepted.hours > 0 
+                                    ? ((day.accepted.hours / (day.accepted.hours + day.rejected.hours)) * 100).toFixed(1) 
+                                    : '0.0';
+
+                                return (
+                                    <tr key={day.date}>
+                                        <td>
+                                            <div className="pd-table-val">{day.date}</div>
+                                        </td>
+                                        <td className="pd-text-center">
+                                            <div className="pd-table-val">{day.activeProducers}</div>
+                                        </td>
+                                        <td className="pd-text-center">
+                                            <div className="pd-table-val">{formatDecimalHours(day.total.hours)}</div>
+                                            <div className="pd-table-subtext">{day.total.count.toLocaleString()} clips</div>
+                                        </td>
+                                        <td className="pd-text-center">
+                                            <div className="pd-table-val-success">{formatDecimalHours(day.accepted.hours)}</div>
+                                            <div className="pd-table-subtext">{day.accepted.count.toLocaleString()} clips</div>
+                                        </td>
+                                        <td className="pd-text-center">
+                                            <div className="pd-table-val-danger">{formatDecimalHours(day.rejected.hours)}</div>
+                                            <div className="pd-table-subtext">{day.rejected.count.toLocaleString()} clips</div>
+                                        </td>
+                                        <td className="pd-text-center">
+                                            <div className="pd-table-val-warning">{formatDecimalHours(day.pending.hours)}</div>
+                                            <div className="pd-table-subtext">{day.pending.count.toLocaleString()} clips</div>
+                                        </td>
+                                        <td className="pd-text-center">
+                                            <div className="pd-table-val-primary">{passRate}%</div>
+                                        </td>
+                                    </tr>
+                                );
+                            })
+                        ) : (
+                            <tr>
+                                <td colSpan="7" className="pd-empty-state">
+                                    {isFetching ? <Loader2 className="spinning pd-icon-center" size={24} /> : 'No data found for the selected filters.'}
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
         </div>
     );
 }
