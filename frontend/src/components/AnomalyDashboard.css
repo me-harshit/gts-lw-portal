@@ -1,11 +1,37 @@
 /* --- frontend/src/components/AnomalyDashboard.css --- */
 
 .anomaly-dashboard-container {
-    max-width: 1200px;
+    max-width: 1200px !important;
     margin: 0 auto;
-    padding: 24px;
-    background: var(--bg-main);
-    border-radius: 12px;
+}
+
+.anomaly-header-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.anomaly-header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.anomaly-header-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 16px;
+}
+
+.anomaly-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
 .anomaly-header-title {
@@ -20,10 +46,55 @@
 
 .anomaly-desc {
     color: var(--text-muted);
-    margin-top: 8px;
+    margin-bottom: 32px;
     font-size: 14.5px;
-    max-width: 600px;
-    line-height: 1.5;
+    max-width: 800px;
+    line-height: 1.6;
+}
+
+/* --- TABS --- */
+.anomaly-tabs {
+    display: flex;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 4px;
+    gap: 4px;
+    width: max-content;
+}
+
+.anomaly-tab-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.anomaly-tab-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+body.dark-mode .anomaly-tab-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.anomaly-tab-btn.active {
+    background: #ef4444;
+    color: white;
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
+}
+
+.anomaly-tab-btn.active.warning {
+    background: #f59e0b;
+    box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);
 }
 
 /* --- STATS CARDS --- */
@@ -43,13 +114,8 @@
     border: 1px solid var(--border-color);
 }
 
-.anomaly-stat-card.danger {
-    border-left: 4px solid #ef4444;
-}
-
-.anomaly-stat-card.warning {
-    border-left: 4px solid #f59e0b;
-}
+.anomaly-stat-card.danger { border-left: 4px solid #ef4444; }
+.anomaly-stat-card.warning { border-left: 4px solid #f59e0b; }
 
 .anomaly-stat-label {
     color: var(--text-muted);
@@ -67,10 +133,7 @@
     font-weight: bold;
     color: var(--text-main);
 }
-
-.anomaly-stat-value.warning {
-    color: #f59e0b;
-}
+.anomaly-stat-value.warning { color: #f59e0b; }
 
 /* --- BUTTONS --- */
 .export-anomaly-btn {
@@ -80,13 +143,13 @@
     background-color: #ef4444;
     color: white;
     border: none;
-    padding: 10px 20px;
+    padding: 0 16px;
     border-radius: 8px;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
-    height: 44px;
+    height: 40px;
 }
 
 .export-anomaly-btn:hover:not(:disabled) {
@@ -106,6 +169,7 @@
     border: 1px solid var(--border-color);
     border-radius: 8px;
     overflow-x: auto;
+    margin-bottom: 16px;
 }
 
 .anomaly-table {
@@ -132,12 +196,27 @@
 }
 
 .anomaly-table tr:hover td {
-    background-color: rgba(239, 68, 68, 0.02); /* Slight red tint on hover */
+    background-color: rgba(239, 68, 68, 0.02);
 }
 
 .anomaly-id-cell {
     font-family: monospace;
     color: var(--primary);
+    font-size: 13px;
+}
+
+.anomaly-producer-cell {
+    color: var(--text-main);
+    font-weight: 500;
+}
+
+.anomaly-locked-cell {
+    font-weight: bold;
+    color: #10b981;
+}
+
+.anomaly-date-cell {
+    color: var(--text-muted);
     font-size: 13px;
 }
 
@@ -148,4 +227,67 @@
     font-weight: 700;
     background: rgba(239, 68, 68, 0.1);
     color: #ef4444;
+}
+
+.anomaly-status-badge.passed {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+}
+
+.anomaly-status-badge.pending {
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+}
+
+.text-center { text-align: center; }
+
+.anomaly-empty-state {
+    padding: 40px !important;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+/* --- PAGINATION --- */
+.anomaly-pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+}
+
+.pagination-info {
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+.pagination-info span {
+    font-weight: bold;
+    color: var(--text-main);
+}
+
+.pagination-controls {
+    display: flex;
+    gap: 8px;
+}
+
+.pagination-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-main);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.pagination-btn:hover:not(:disabled) {
+    background: var(--border-color);
+}
+
+.pagination-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
 }

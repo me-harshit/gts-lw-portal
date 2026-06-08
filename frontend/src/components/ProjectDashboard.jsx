@@ -7,7 +7,7 @@ import './ProjectDashboard.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder, containerStyle }) => {
+const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder, className }) => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
 
@@ -22,13 +22,13 @@ const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder, conta
     const selectedLabel = options.find(o => o.value === value)?.label || placeholder;
 
     return (
-        <div className="searchable-dropdown-container" style={containerStyle || { width: 'auto', minWidth: '160px' }} ref={dropdownRef}>
-            <div className="searchable-dropdown-header" onClick={() => setIsOpen(!isOpen)} style={{ height: '100%', width: '100%' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
-                    {Icon && <Icon size={16} color="var(--text-muted)" style={{ flexShrink: 0 }} />}
-                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', width: '100%' }}>{selectedLabel}</span>
+        <div className={`searchable-dropdown-container ${className || ''}`} ref={dropdownRef}>
+            <div className="searchable-dropdown-header" onClick={() => setIsOpen(!isOpen)}>
+                <div className="searchable-dropdown-header-content">
+                    {Icon && <Icon size={16} className="searchable-dropdown-icon" />}
+                    <span className="searchable-dropdown-text">{selectedLabel}</span>
                 </div>
-                <ChevronDown size={16} color="var(--text-muted)" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s', flexShrink: 0 }} />
+                <ChevronDown size={16} className={`searchable-dropdown-caret ${isOpen ? 'open' : ''}`} />
             </div>
             {isOpen && (
                 <div className="searchable-dropdown-menu">
@@ -60,15 +60,13 @@ export default function ProjectDashboard() {
     const [teams, setTeams] = useState([]);
     const [teamConfigs, setTeamConfigs] = useState([]);
 
-    // Corrected Math to convert decimal hours to XXh YYmin
     const formatDecimalHours = (decimalHours) => {
-        if (!decimalHours || isNaN(decimalHours) || decimalHours === 0) return '0h 0min';
+        if (!decimalHours || isNaN(decimalHours) || decimalHours === 0) return '0h 0m';
         
         const hrs = Math.floor(decimalHours);
         const mins = Math.round((decimalHours - hrs) * 60);
         
-        // Handle edge case where rounding pushes minutes to 60
-        if (mins === 60) return `${hrs + 1}h 0min`;
+        if (mins === 60) return `${hrs + 1}h 0m`;
         
         return `${hrs}h ${mins}m`;
     };
@@ -148,15 +146,15 @@ export default function ProjectDashboard() {
     const inspectedRate = totalHours > 0 ? ((inspectedHours / totalHours) * 100).toFixed(1) : '0.0';
 
     return (
-        <div className="dashboard-card" style={{ maxWidth: '1400px', margin: '0 auto' }}>
+        <div className="dashboard-card pd-container">
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '32px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-                    <h2 className="dashboard-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                        <Activity color="var(--primary)" size={24} />
+            <div className="pd-header-section">
+                <div className="pd-header-row">
+                    <h2 className="dashboard-header pd-title">
+                        <Activity className="pd-icon-primary" size={24} />
                         Project Overview
                     </h2>
-                    <div className="quick-filters-container" style={{ margin: 0 }}>
+                    <div className="quick-filters-container pd-no-margin">
                         <button className={`quick-filter-btn ${activeGlobalFilter === 'allTime' ? 'active' : ''}`} onClick={() => applyQuickFilter('allTime')}>All Time</button>
                         <button className={`quick-filter-btn ${activeGlobalFilter === 'today' ? 'active' : ''}`} onClick={() => applyQuickFilter('today')}>Today</button>
                         <button className={`quick-filter-btn ${activeGlobalFilter === 'yesterday' ? 'active' : ''}`} onClick={() => applyQuickFilter('yesterday')}>Yesterday</button>
@@ -165,83 +163,83 @@ export default function ProjectDashboard() {
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <CustomSelect icon={TagIcon} value={activeTag} onChange={setActiveTag} options={[{ value: 'ALL', label: 'All Tags' }, ...tags.map(t => ({ value: t, label: t }))]} containerStyle={{ width: '180px', height: '40px' }} />
-                    <CustomSelect icon={Clock} value={activeShift} onChange={setActiveShift} options={[{ value: 'ALL', label: 'All Shifts' }, ...shifts.map(s => ({ value: s, label: s }))]} containerStyle={{ width: '220px', height: '40px' }} />
-                    <CustomSelect icon={Users} value={teamCategory} onChange={setTeamCategory} options={[{ value: 'ALL', label: 'All Teams' }, ...teams.map(t => ({ value: t, label: t }))]} containerStyle={{ width: '180px', height: '40px' }} />
-                    <CustomSelect icon={Filter} value={viewCategory} onChange={setViewCategory} options={[{ value: 'ALL', label: 'All Projects' }, { value: 'OFFICE', label: 'Office Tasks' }, { value: 'HOUSE', label: 'House Tasks' }]} containerStyle={{ width: '180px', height: '40px' }} />
+                <div className="pd-filter-row">
+                    <CustomSelect className="pd-select-sm" icon={TagIcon} value={activeTag} onChange={setActiveTag} options={[{ value: 'ALL', label: 'All Tags' }, ...tags.map(t => ({ value: t, label: t }))]} />
+                    <CustomSelect className="pd-select-md" icon={Clock} value={activeShift} onChange={setActiveShift} options={[{ value: 'ALL', label: 'All Shifts' }, ...shifts.map(s => ({ value: s, label: s }))]} />
+                    <CustomSelect className="pd-select-sm" icon={Users} value={teamCategory} onChange={setTeamCategory} options={[{ value: 'ALL', label: 'All Teams' }, ...teams.map(t => ({ value: t, label: t }))]} />
+                    <CustomSelect className="pd-select-sm" icon={Filter} value={viewCategory} onChange={setViewCategory} options={[{ value: 'ALL', label: 'All Projects' }, { value: 'OFFICE', label: 'Office Tasks' }, { value: 'HOUSE', label: 'House Tasks' }]} />
 
-                    <div className="searchable-dropdown-header" style={{ cursor: 'default', height: '40px' }}>
-                        <Calendar size={16} color="var(--text-muted)" />
-                        <input type="date" value={startDate} onChange={(e) => handleDateChange(e.target.value, true)} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none', paddingLeft: '8px' }} />
-                        <span style={{ color: 'var(--text-muted)', margin: '0 8px' }}>to</span>
-                        <input type="date" value={endDate} onChange={(e) => handleDateChange(e.target.value, false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none' }} />
+                    <div className="pd-date-wrapper">
+                        <Calendar size={16} className="pd-icon-muted" />
+                        <input type="date" className="pd-date-input" value={startDate} onChange={(e) => handleDateChange(e.target.value, true)} />
+                        <span className="pd-date-separator">to</span>
+                        <input type="date" className="pd-date-input" value={endDate} onChange={(e) => handleDateChange(e.target.value, false)} />
                     </div>
                 </div>
             </div>
 
-            <div className="summary-cards" style={{ opacity: isFetching ? 0.5 : 1, transition: 'opacity 0.2s', marginBottom: '40px', flexWrap: 'wrap' }}>
+            <div className={`summary-cards pd-summary-wrap ${isFetching ? 'pd-is-fetching' : ''}`}>
                 <div className="summary-card">
                     <span className="card-title">Total Volume</span>
-                    <div style={{ display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
-                        <span className="card-value" style={{ color: 'var(--primary)', lineHeight: '1' }}>{formatDecimalHours(totalHours)}</span>
-                        <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>{totalCount.toLocaleString()} clips</span>
+                    <div className="pd-summary-content">
+                        <span className="card-value pd-text-primary">{formatDecimalHours(totalHours)}</span>
+                        <span className="pd-summary-subtext">{totalCount.toLocaleString()} clips</span>
                     </div>
                 </div>
                 <div className="summary-card">
                     <span className="card-title">Total Accepted</span>
-                    <div style={{ display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
-                        <span className="card-value" style={{ color: '#10b981', lineHeight: '1' }}>{formatDecimalHours(acceptedHours)}</span>
-                        <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>{acceptedCount.toLocaleString()} clips</span>
-                        {inspectedCount > 0 && <span style={{ fontSize: '13px', color: 'var(--text-main)', marginTop: '2px', fontWeight: '600' }}>Acceptance Rate - {acceptanceRate}%</span>}
+                    <div className="pd-summary-content">
+                        <span className="card-value pd-text-success">{formatDecimalHours(acceptedHours)}</span>
+                        <span className="pd-summary-subtext">{acceptedCount.toLocaleString()} clips</span>
+                        {inspectedCount > 0 && <span className="pd-summary-subtext-bold">Acceptance Rate - {acceptanceRate}%</span>}
                     </div>
                 </div>
                 <div className="summary-card">
                     <span className="card-title">Total Rejected</span>
-                    <div style={{ display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
-                        <span className="card-value" style={{ color: '#ef4444', lineHeight: '1' }}>{formatDecimalHours(rejectedHours)}</span>
-                        <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>{rejectedCount.toLocaleString()} clips</span>
-                        {inspectedCount > 0 && <span style={{ fontSize: '13px', color: 'var(--text-main)', marginTop: '2px', fontWeight: '600' }}>Rejection Rate - {rejectionRate}%</span>}
+                    <div className="pd-summary-content">
+                        <span className="card-value pd-text-danger">{formatDecimalHours(rejectedHours)}</span>
+                        <span className="pd-summary-subtext">{rejectedCount.toLocaleString()} clips</span>
+                        {inspectedCount > 0 && <span className="pd-summary-subtext-bold">Rejection Rate - {rejectionRate}%</span>}
                     </div>
                 </div>
                 <div className="summary-card">
                     <span className="card-title">QC Done</span>
-                    <div style={{ display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
-                        <span className="card-value" style={{ color: '#3b82f6', lineHeight: '1' }}>{formatDecimalHours(inspectedHours)}</span>
-                        <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>{inspectedCount.toLocaleString()} clips</span>
-                        {totalCount > 0 && <span style={{ fontSize: '13px', color: 'var(--text-main)', marginTop: '2px', fontWeight: '600' }}>QC Completed - {inspectedRate}%</span>}
+                    <div className="pd-summary-content">
+                        <span className="card-value pd-text-info">{formatDecimalHours(inspectedHours)}</span>
+                        <span className="pd-summary-subtext">{inspectedCount.toLocaleString()} clips</span>
+                        {totalCount > 0 && <span className="pd-summary-subtext-bold">QC Completed - {inspectedRate}%</span>}
                     </div>
                 </div>
                 <div className="summary-card">
                     <span className="card-title">Pending QC</span>
-                    <div style={{ display: 'flex', flexDirection: 'column', marginTop: '8px' }}>
-                        <span className="card-value" style={{ color: '#f59e0b', lineHeight: '1' }}>{formatDecimalHours(pendingHours)}</span>
-                        <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', fontWeight: '500' }}>{pendingCount.toLocaleString()} clips</span>
-                        {totalCount > 0 && <span style={{ fontSize: '13px', color: 'var(--text-main)', marginTop: '2px', fontWeight: '600' }}>QC Pending - {pendingRate}%</span>}
+                    <div className="pd-summary-content">
+                        <span className="card-value pd-text-warning">{formatDecimalHours(pendingHours)}</span>
+                        <span className="pd-summary-subtext">{pendingCount.toLocaleString()} clips</span>
+                        {totalCount > 0 && <span className="pd-summary-subtext-bold">QC Pending - {pendingRate}%</span>}
                     </div>
                 </div>
             </div>
 
-            <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '40px 0 24px 0' }} />
+            <hr className="pd-divider" />
             
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)' }}>
-                    <TrendingUp size={20} color="var(--primary)" />
+            <div className="pd-section-header">
+                <h3 className="pd-section-title">
+                    <TrendingUp size={20} className="pd-icon-primary" />
                     Daily Production Summary
                 </h3>
             </div>
 
-            <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-main)', opacity: isFetching ? 0.6 : 1, transition: 'opacity 0.2s' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <div className={`pd-table-wrapper ${isFetching ? 'pd-is-fetching' : ''}`}>
+                <table className="pd-table">
                     <thead>
                         <tr>
-                            <th style={{ padding: '16px', background: 'var(--bg-secondary)', color: 'var(--text-muted)', fontSize: '12px', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)' }}>Date</th>
-                            <th style={{ padding: '16px', background: 'var(--bg-secondary)', color: 'var(--text-muted)', fontSize: '12px', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)', textAlign: 'center' }}>Active Collectors</th>
-                            <th style={{ padding: '16px', background: 'var(--bg-secondary)', color: 'var(--text-muted)', fontSize: '12px', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)', textAlign: 'center' }}>Hrs Collected</th>
-                            <th style={{ padding: '16px', background: 'var(--bg-secondary)', color: '#10b981', fontSize: '12px', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)', textAlign: 'center' }}>QC Pass</th>
-                            <th style={{ padding: '16px', background: 'var(--bg-secondary)', color: '#ef4444', fontSize: '12px', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)', textAlign: 'center' }}>QC Fail</th>
-                            <th style={{ padding: '16px', background: 'var(--bg-secondary)', color: '#f59e0b', fontSize: '12px', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)', textAlign: 'center' }}>QC Pending</th>
-                            <th style={{ padding: '16px', background: 'var(--bg-secondary)', color: 'var(--text-main)', fontSize: '12px', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)', textAlign: 'center' }}>Pass Rate</th>
+                            <th>Date</th>
+                            <th className="pd-text-center">Active Collectors</th>
+                            <th className="pd-text-center">Hrs Collected</th>
+                            <th className="pd-text-center pd-th-success">QC Pass</th>
+                            <th className="pd-text-center pd-th-danger">QC Fail</th>
+                            <th className="pd-text-center pd-th-warning">QC Pending</th>
+                            <th className="pd-text-center pd-th-main">Pass Rate</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -252,39 +250,39 @@ export default function ProjectDashboard() {
                                     : '0.0';
 
                                 return (
-                                    <tr key={day.date} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                        <td style={{ padding: '16px' }}>
-                                            <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-main)' }}>{day.date}</div>
+                                    <tr key={day.date}>
+                                        <td>
+                                            <div className="pd-table-val">{day.date}</div>
                                         </td>
-                                        <td style={{ padding: '16px', textAlign: 'center' }}>
-                                            <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)' }}>{day.activeProducers}</div>
+                                        <td className="pd-text-center">
+                                            <div className="pd-table-val">{day.activeProducers}</div>
                                         </td>
-                                        <td style={{ padding: '16px', textAlign: 'center' }}>
-                                            <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)' }}>{formatDecimalHours(day.total.hours)}</div>
-                                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{day.total.count.toLocaleString()} clips</div>
+                                        <td className="pd-text-center">
+                                            <div className="pd-table-val">{formatDecimalHours(day.total.hours)}</div>
+                                            <div className="pd-table-subtext">{day.total.count.toLocaleString()} clips</div>
                                         </td>
-                                        <td style={{ padding: '16px', textAlign: 'center' }}>
-                                            <div style={{ fontSize: '15px', fontWeight: '600', color: '#10b981' }}>{formatDecimalHours(day.accepted.hours)}</div>
-                                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{day.accepted.count.toLocaleString()} clips</div>
+                                        <td className="pd-text-center">
+                                            <div className="pd-table-val-success">{formatDecimalHours(day.accepted.hours)}</div>
+                                            <div className="pd-table-subtext">{day.accepted.count.toLocaleString()} clips</div>
                                         </td>
-                                        <td style={{ padding: '16px', textAlign: 'center' }}>
-                                            <div style={{ fontSize: '15px', fontWeight: '600', color: '#ef4444' }}>{formatDecimalHours(day.rejected.hours)}</div>
-                                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{day.rejected.count.toLocaleString()} clips</div>
+                                        <td className="pd-text-center">
+                                            <div className="pd-table-val-danger">{formatDecimalHours(day.rejected.hours)}</div>
+                                            <div className="pd-table-subtext">{day.rejected.count.toLocaleString()} clips</div>
                                         </td>
-                                        <td style={{ padding: '16px', textAlign: 'center' }}>
-                                            <div style={{ fontSize: '15px', fontWeight: '600', color: '#f59e0b' }}>{formatDecimalHours(day.pending.hours)}</div>
-                                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{day.pending.count.toLocaleString()} clips</div>
+                                        <td className="pd-text-center">
+                                            <div className="pd-table-val-warning">{formatDecimalHours(day.pending.hours)}</div>
+                                            <div className="pd-table-subtext">{day.pending.count.toLocaleString()} clips</div>
                                         </td>
-                                        <td style={{ padding: '16px', textAlign: 'center' }}>
-                                            <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--primary)' }}>{passRate}%</div>
+                                        <td className="pd-text-center">
+                                            <div className="pd-table-val-primary">{passRate}%</div>
                                         </td>
                                     </tr>
                                 );
                             })
                         ) : (
                             <tr>
-                                <td colSpan="7" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                                    {isFetching ? <Loader2 className="spinning" style={{ margin: '0 auto' }} /> : 'No data found for the selected filters.'}
+                                <td colSpan="7" className="pd-empty-state">
+                                    {isFetching ? <Loader2 className="spinning pd-icon-center" size={24} /> : 'No data found for the selected filters.'}
                                 </td>
                             </tr>
                         )}

@@ -53,6 +53,10 @@
 }
 
 /* --- CUSTOM SELECTS --- */
+.searchable-dropdown-container {
+    position: relative;
+}
+
 .pd-select-sm {
     width: 180px;
     height: 40px;
@@ -81,6 +85,11 @@
     font-weight: 600; 
     transition: all 0.2s ease; 
     box-sizing: border-box;
+}
+
+.searchable-dropdown-header:hover {
+    background: rgba(59, 130, 246, 0.12);
+    border-color: rgba(59, 130, 246, 0.5);
 }
 
 .searchable-dropdown-header-content {
@@ -114,10 +123,72 @@
     transform: rotate(180deg);
 }
 
+.searchable-dropdown-menu {
+    position: absolute; 
+    top: 100%; 
+    left: 0; 
+    right: 0; 
+    margin-top: 8px;
+    background-color: var(--bg-main, #ffffff) !important;
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    border-radius: 8px; 
+    box-shadow: 0 12px 40px rgba(0,0,0,0.3), 0 0 0 1px rgba(59, 130, 246, 0.1);
+    z-index: 1000; 
+    overflow: hidden;
+}
+
+body.dark-mode .searchable-dropdown-menu {
+    background-color: var(--bg-main, #1e1e2d) !important;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.7);
+}
+
+.searchable-dropdown-list { 
+    max-height: 250px; 
+    overflow-y: auto; 
+    margin: 0; 
+    padding: 0; 
+    list-style: none; 
+}
+
+.searchable-dropdown-item { 
+    padding: 12px 16px; 
+    cursor: pointer; 
+    color: var(--text-main); 
+    font-size: 14px; 
+    font-weight: 500;
+    transition: background-color 0.1s ease; 
+}
+
+.searchable-dropdown-item:hover { 
+    background-color: rgba(59, 130, 246, 0.15); 
+    color: var(--primary); 
+}
+
+.searchable-dropdown-item.active { 
+    background-color: var(--primary); 
+    color: white; 
+}
+
 /* --- DATE PICKER --- */
 .pd-date-wrapper {
     height: 40px;
     cursor: default;
+    display: flex;
+    align-items: center;
+    padding: 8px 12px; 
+    background: rgba(59, 130, 246, 0.08); 
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 8px;
+    transition: all 0.2s ease; 
+    box-sizing: border-box;
+    width: max-content; 
+}
+
+.pd-date-wrapper:hover {
+    background: rgba(59, 130, 246, 0.12);
+    border-color: rgba(59, 130, 246, 0.5);
 }
 
 .pd-date-input {
@@ -126,11 +197,16 @@
     color: var(--text-main);
     outline: none;
     padding-left: 8px;
+    font-family: inherit;
+    font-size: 14px;
+    cursor: pointer;
 }
 
 .pd-date-separator {
     color: var(--text-muted);
     margin: 0 8px;
+    font-size: 13px;
+    font-weight: 500;
 }
 
 /* --- SUMMARY CARDS --- */

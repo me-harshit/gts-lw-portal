@@ -70,3 +70,127 @@
     margin-left: auto;
     margin-right: auto;
 }
+
+/* ProducerAnalytics.css Additions */
+
+.producer-analytics-container {
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* This restricts the Producer Search dropdown so it stays inline */
+.pd-producer-select {
+    width: 300px;
+    height: 40px;
+}
+
+.producer-stats-banner {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+    background: var(--bg-secondary);
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    flex-wrap: wrap;
+}
+
+.producer-stat-block {
+    flex: 1;
+    min-width: 120px;
+}
+
+.producer-stat-block:not(:first-child) {
+    border-left: 1px solid var(--border-color);
+    padding-left: 16px;
+}
+
+.stat-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.stat-primary-val {
+    font-size: 15px;
+    font-weight: 600;
+    margin-top: 4px;
+}
+
+.stat-secondary-val {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    font-weight: 500;
+}
+
+/* Empty State Styling */
+.empty-producer-state {
+    padding: 80px 20px;
+    text-align: center;
+    border: 1px dashed var(--border-color);
+    border-radius: 12px;
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+    margin-top: 20px;
+}
+
+.empty-producer-state h3 {
+    margin: 16px 0 8px 0;
+    color: var(--text-main);
+    font-size: 18px;
+}
+
+.empty-producer-state p {
+    margin: 0;
+    font-size: 14px;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* --- SEARCH BOX INSIDE DROPDOWN --- */
+.searchable-dropdown-search {
+    padding: 10px; 
+    background: rgba(59, 130, 246, 0.05); 
+    border-bottom: 1px solid rgba(59, 130, 246, 0.15); 
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.searchable-dropdown-search input {
+    width: 100%; 
+    padding: 10px 12px 10px 36px; /* Extra left padding for the icon */
+    background-color: var(--bg-main, #ffffff); 
+    border: 1px solid var(--border-color); 
+    color: var(--text-main);
+    border-radius: 6px; 
+    outline: none; 
+    font-size: 13px; 
+    box-sizing: border-box;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+
+body.dark-mode .searchable-dropdown-search input {
+    background-color: var(--bg-main, #1e1e2d);
+}
+
+.searchable-dropdown-search input:focus { 
+    border-color: var(--primary); 
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.searchable-dropdown-search-icon { 
+    position: absolute; 
+    left: 20px; 
+    color: var(--text-muted); 
+    pointer-events: none; /* Prevents icon from blocking clicks */
+}
+
+/* Change icon color when input is focused */
+.searchable-dropdown-search:focus-within .searchable-dropdown-search-icon {
+    color: var(--primary);
+}

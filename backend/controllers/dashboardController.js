@@ -458,28 +458,54 @@ export const stopTranslation = (req, res) => {
 
 export const getAnomalies = async (req, res) => {
     try {
-        const { startDate, endDate, page = 1, limit = 50 } = req.query;
-        let query = { is_downgraded: true };
+        const { startDate, endDate, page = 1, limit = 50, type = 'DOWNGRADED' } = req.query;
+        let query = {};
 
+        // Define query based on anomaly type
+        if (type === 'ZERO_DURATION') {
+            // Find records where duration is 0, null, or missing
+            query = { 
+                $or: [
+                    { video_duration: 0 }, 
+                    { video_duration: null }, 
+                    { video_duration: { $exists: false } }
+                ] 
+            };
+        } else {
+            query = { is_downgraded: true };
+        }
+
+        // Apply Date Filters
         if (startDate && endDate) {
             const start = new Date(`${startDate}T00:00:00.000Z`);
             const end = new Date(`${endDate}T23:59:59.999Z`);
-            query.updatedAt = { $gte: start, $lte: end };
+            // Use different date fields based on the anomaly context
+            if (type === 'ZERO_DURATION') {
+                query.start_produce_time = { $gte: start, $lte: end };
+            } else {
+                query.updatedAt = { $gte: start, $lte: end };
+            }
         }
 
         const skip = (Number(page) - 1) * Number(limit);
         const totalRecords = await AllRecord.countDocuments(query);
         const totalPages = Math.ceil(totalRecords / Number(limit));
 
-        const aggregation = await AllRecord.aggregate([
-            { $match: query },
-            { $group: { _id: null, totalLostSeconds: { $sum: "$locked_duration" } } }
-        ]);
-        const totalLostSeconds = aggregation.length > 0 ? aggregation[0].totalLostSeconds : 0;
+        // Only calculate lost seconds for Downgraded records
+        let totalLostSeconds = 0;
+        if (type === 'DOWNGRADED') {
+            const aggregation = await AllRecord.aggregate([
+                { $match: query },
+                { $group: { _id: null, totalLostSeconds: { $sum: "$locked_duration" } } }
+            ]);
+            totalLostSeconds = aggregation.length > 0 ? aggregation[0].totalLostSeconds : 0;
+        }
+
+        const sortField = type === 'ZERO_DURATION' ? { start_produce_time: -1 } : { updatedAt: -1 };
 
         const anomalies = await AllRecord.find(query)
-            .select('data_name producer project_category locked_duration inspect_result status_history updatedAt')
-            .sort({ updatedAt: -1 })
+            .select('data_name producer project_category locked_duration inspect_result status_history updatedAt start_produce_time video_duration task_name')
+            .sort(sortField)
             .skip(skip)
             .limit(Number(limit));
             
