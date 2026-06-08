@@ -301,9 +301,9 @@ export default function QcDashboard() {
                                         {filteredProducers.map(p => (
                                             <li key={p.username} className={`custom-dropdown-item ${selectedProducer?.username === p.username ? 'active' : ''}`} onClick={() => { setSelectedProducer(p); setIsProducerOpen(false); setProducerSearch(''); }}>
                                                 <div style={{ fontWeight: '600' }}>{p.username}</div>
-                                                <div style={{ display: 'flex', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
+                                                <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
                                                     <span style={{ fontSize: '10px', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: '4px', color: 'var(--text-muted)' }}>{p.teamName}</span>
-                                                    {p.tag !== 'N/A' && <span style={{ fontSize: '10px', background: 'rgba(139, 92, 246, 0.1)', padding: '2px 6px', borderRadius: '4px', color: '#8b5cf6' }}>{p.tag}</span>}
+                                                    {p.tag !== 'N/A' && <span style={{ fontSize: '10px', background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)', padding: '2px 6px', borderRadius: '4px', color: '#8b5cf6', display: 'flex', alignItems: 'center', gap: '3px' }}><TagIcon size={10} /> {p.tag}</span>}
                                                 </div>
                                             </li>
                                         ))}
@@ -462,7 +462,6 @@ export default function QcDashboard() {
 
                                 {isExpanded && (
                                     <div className="qc-tree-children">
-                                        {/* --- NEW: Frontend sorting ensures sub-levels are always perfectly sorted --- */}
                                         {node.tasks.sort((a, b) => b.failCount - a.failCount).map((taskNode, tIdx) => {
                                             const taskKey = `${node.title}-${taskNode.taskName}`;
                                             const isTaskExpanded = expandedTasks.has(taskKey);
@@ -498,7 +497,8 @@ export default function QcDashboard() {
                                                                             <td style={{ color: 'var(--primary)', fontWeight: '500' }}>
                                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                                                     <Video size={14} />
-                                                                                    {vid.dataName}
+                                                                                    {/* --- FIX 1: Looks for originalName first, falls back to dataName --- */}
+                                                                                    {vid.originalName || vid.dataName}
                                                                                 </div>
                                                                                 {viewMode !== 'BY_PRODUCER' && (
                                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px', marginLeft: '20px' }}>
@@ -507,7 +507,8 @@ export default function QcDashboard() {
                                                                                 )}
                                                                             </td>
                                                                             <td style={{ color: 'var(--text-main)', lineHeight: '1.5' }}>
-                                                                                {vid.description}
+                                                                                {/* --- FIX 2: Looks for English Feedback first, falls back to raw description --- */}
+                                                                                {vid.englishFeedback || vid.description || 'No feedback provided'}
                                                                             </td>
                                                                         </tr>
                                                                     ))}

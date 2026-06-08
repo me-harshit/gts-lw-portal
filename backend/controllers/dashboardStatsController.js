@@ -10,7 +10,7 @@ export const getDashboardSummary = async (req, res) => {
 
         if (teams && teams !== 'ALL') {
             if (teams === '___NONE___') {
-                match.producer = { $in: [] }; 
+                match.producer = { $in: [] };
             } else {
                 const teamArray = teams.split(',');
                 const mappings = await TeamMap.find({ teamName: { $in: teamArray } }).lean();
@@ -47,10 +47,12 @@ export const getDashboardSummary = async (req, res) => {
         // 2. Daily Trend (Last 10 Days)
         const trendPromise = AllRecord.aggregate([
             { $match: match },
-            { $addFields: { 
-                safe_video_duration: { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } },
-                logical_day: { $dateToString: { format: "%Y-%m-%d", date: { $subtract: [{ $subtract: ["$start_produce_time", 2.5 * 60 * 60 * 1000] }, 6 * 60 * 60 * 1000] } } }
-            }},
+            {
+                $addFields: {
+                    safe_video_duration: { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } },
+                    logical_day: { $dateToString: { format: "%Y-%m-%d", date: { $subtract: [{ $subtract: ["$start_produce_time", 2.5 * 60 * 60 * 1000] }, 6 * 60 * 60 * 1000] } } }
+                }
+            },
             {
                 $group: {
                     _id: "$logical_day",
@@ -65,8 +67,8 @@ export const getDashboardSummary = async (req, res) => {
                     pendingHours: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_WAITING"] }, "$safe_video_duration", 0] } }
                 }
             },
-            { $sort: { _id: -1 } }, 
-            { $limit: 10 } 
+            { $sort: { _id: -1 } },
+            { $limit: 10 }
         ]);
 
         const [statsResult, trendResult] = await Promise.all([statsPromise, trendPromise]);
@@ -125,13 +127,15 @@ export const getProducerHistory = async (req, res) => {
         const statsPromise = AllRecord.aggregate([
             { $match: match },
             { $addFields: { safe_duration: { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } } } },
-            { $group: {
-                _id: null,
-                totalSec: { $sum: "$safe_duration" },
-                acceptedSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_PASSED"] }, "$safe_duration", 0] } },
-                rejectedSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_FAILED"] }, "$safe_duration", 0] } },
-                waitingSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_WAITING"] }, "$safe_duration", 0] } }
-            }}
+            {
+                $group: {
+                    _id: null,
+                    totalSec: { $sum: "$safe_duration" },
+                    acceptedSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_PASSED"] }, "$safe_duration", 0] } },
+                    rejectedSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_FAILED"] }, "$safe_duration", 0] } },
+                    waitingSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_WAITING"] }, "$safe_duration", 0] } }
+                }
+            }
         ]);
 
         // 2. Break down stats by Task (Combining Task ID and Task Name via Lookup)
@@ -146,28 +150,32 @@ export const getProducerHistory = async (req, res) => {
                 }
             },
             { $unwind: { path: "$taskDetails", preserveNullAndEmptyArrays: true } },
-            { $addFields: { 
-                safe_duration: { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } },
-                taskName: { $ifNull: ["$taskDetails.taskName", "$task_name", "Unknown"] },
-                taskId: { $ifNull: ["$platform_task_id", "No-ID"] }
-            }},
-            { $group: {
-                _id: "$taskId",
-                taskName: { $first: "$taskName" },
-                totalVideos: { $sum: 1 },
-                totalSec: { $sum: "$safe_duration" },
-                passedVideos: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_PASSED"] }, 1, 0] } },
-                passedSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_PASSED"] }, "$safe_duration", 0] } },
-                failedVideos: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_FAILED"] }, 1, 0] } },
-                failedSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_FAILED"] }, "$safe_duration", 0] } },
-                waitingVideos: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_WAITING"] }, 1, 0] } },
-                waitingSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_WAITING"] }, "$safe_duration", 0] } }
-            }},
+            {
+                $addFields: {
+                    safe_duration: { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } },
+                    taskName: { $ifNull: ["$taskDetails.taskName", "$task_name", "Unknown"] },
+                    taskId: { $ifNull: ["$platform_task_id", "No-ID"] }
+                }
+            },
+            {
+                $group: {
+                    _id: "$taskId",
+                    taskName: { $first: "$taskName" },
+                    totalVideos: { $sum: 1 },
+                    totalSec: { $sum: "$safe_duration" },
+                    passedVideos: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_PASSED"] }, 1, 0] } },
+                    passedSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_PASSED"] }, "$safe_duration", 0] } },
+                    failedVideos: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_FAILED"] }, 1, 0] } },
+                    failedSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_FAILED"] }, "$safe_duration", 0] } },
+                    waitingVideos: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_WAITING"] }, 1, 0] } },
+                    waitingSec: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_WAITING"] }, "$safe_duration", 0] } }
+                }
+            },
             { $sort: { totalSec: -1 } } // Sort tasks by most time spent
         ]);
 
         const [statsRes, tasks] = await Promise.all([statsPromise, tasksPromise]);
-        
+
         const stats = statsRes[0] || { totalSec: 0, acceptedSec: 0, rejectedSec: 0, waitingSec: 0 };
 
         res.json({
@@ -273,7 +281,10 @@ export const getQcDetails = async (req, res) => {
                     taskIdStr: { $ifNull: ["$platform_task_id", "No-ID"] },
                     reason: { $ifNull: ["$inspect_issue_description_en", "$inspect_issue_description", "Unspecified Reason"] },
                     description: { $ifNull: ["$inspect_issue_description", "No description provided."] }, // Fallback to original
-                    cleanDataName: { $ifNull: ["$data_name_en", "$data_name"] }
+                    cleanDataName: { $ifNull: ["$data_name_en", "$data_name"] },
+
+                    englishFeedback: { $ifNull: ["$inspect_issue_description_en", "$inspect_issue_description"] },
+                    originalName: "$data_name"
                 }
             },
             {
@@ -289,7 +300,11 @@ export const getQcDetails = async (req, res) => {
                         $push: {
                             dataName: "$cleanDataName",
                             description: "$description",
-                            producer: "$producer"
+                            producer: "$producer",
+
+                            // <-- NEW: Push the new mapped fields into the video array so the frontend can read them
+                            englishFeedback: "$englishFeedback",
+                            originalName: "$originalName"
                         }
                     }
                 }

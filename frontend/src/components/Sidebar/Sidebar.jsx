@@ -135,7 +135,7 @@ export default function Sidebar() {
               onClick={() => navigate('/qc-leaderboard')}
             >
               <Trophy size={18} className="nav-icon" />
-              <span>QV Leaderboard</span>
+              <span>QC Leaderboard</span>
             </button>
 
             <button
