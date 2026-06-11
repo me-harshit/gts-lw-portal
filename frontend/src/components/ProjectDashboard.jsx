@@ -62,12 +62,12 @@ export default function ProjectDashboard() {
 
     const formatDecimalHours = (decimalHours) => {
         if (!decimalHours || isNaN(decimalHours) || decimalHours === 0) return '0h 0m';
-        
+
         const hrs = Math.floor(decimalHours);
         const mins = Math.round((decimalHours - hrs) * 60);
-        
+
         if (mins === 60) return `${hrs + 1}h 0m`;
-        
+
         return `${hrs}h ${mins}m`;
     };
 
@@ -76,12 +76,16 @@ export default function ProjectDashboard() {
         const today = new Date();
         const formatDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
-        if (type === 'today') { setStartDate(formatDate(today)); setEndDate(formatDate(today)); } 
-        else if (type === 'yesterday') { const y = new Date(today); y.setDate(y.getDate() - 1); setStartDate(formatDate(y)); setEndDate(formatDate(y)); } 
-        else if (type === 'thisWeek') { const m = new Date(today); m.setDate(m.getDate() - (m.getDay() || 7) + 1); setStartDate(formatDate(m)); setEndDate(formatDate(today)); } 
-        else if (type === 'thisMonth') { setStartDate(formatDate(new Date(today.getFullYear(), today.getMonth(), 1))); setEndDate(formatDate(today)); } 
+        if (type === 'today') { setStartDate(formatDate(today)); setEndDate(formatDate(today)); }
+        else if (type === 'yesterday') { const y = new Date(today); y.setDate(y.getDate() - 1); setStartDate(formatDate(y)); setEndDate(formatDate(y)); }
+        else if (type === 'thisWeek') { const m = new Date(today); m.setDate(m.getDate() - (m.getDay() || 7) + 1); setStartDate(formatDate(m)); setEndDate(formatDate(today)); }
+        else if (type === 'thisMonth') { setStartDate(formatDate(new Date(today.getFullYear(), today.getMonth(), 1))); setEndDate(formatDate(today)); }
         else { setStartDate(''); setEndDate(''); }
     };
+
+    useEffect(() => {
+        applyQuickFilter('thisMonth');
+    }, []);
 
     const handleDateChange = (value, isStart) => {
         setActiveGlobalFilter('');
@@ -111,7 +115,7 @@ export default function ProjectDashboard() {
     if (teamCategory !== 'ALL') matchingTeams = matchingTeams.filter(t => t.name === teamCategory);
 
     let teamQuery = 'ALL';
-    if ((activeTag !== 'ALL' || activeShift !== 'ALL' || teamCategory !== 'ALL') && matchingTeams.length === 0) teamQuery = '___NONE___'; 
+    if ((activeTag !== 'ALL' || activeShift !== 'ALL' || teamCategory !== 'ALL') && matchingTeams.length === 0) teamQuery = '___NONE___';
     else if (activeTag !== 'ALL' || activeShift !== 'ALL' || teamCategory !== 'ALL') teamQuery = matchingTeams.map(t => t.name).join(',');
 
     const { data: summary, isFetching } = useQuery({
@@ -221,7 +225,7 @@ export default function ProjectDashboard() {
             </div>
 
             <hr className="pd-divider" />
-            
+
             <div className="pd-section-header">
                 <h3 className="pd-section-title">
                     <TrendingUp size={20} className="pd-icon-primary" />
@@ -245,8 +249,8 @@ export default function ProjectDashboard() {
                     <tbody>
                         {summary?.trend?.length > 0 ? (
                             summary.trend.map(day => {
-                                const passRate = day.accepted.hours > 0 
-                                    ? ((day.accepted.hours / (day.accepted.hours + day.rejected.hours)) * 100).toFixed(1) 
+                                const passRate = day.accepted.hours > 0
+                                    ? ((day.accepted.hours / (day.accepted.hours + day.rejected.hours)) * 100).toFixed(1)
                                     : '0.0';
 
                                 return (

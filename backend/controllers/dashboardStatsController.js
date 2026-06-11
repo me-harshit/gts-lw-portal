@@ -4,30 +4,45 @@ import TeamMap from '../models/TeamMap.js';
 export const getDashboardSummary = async (req, res) => {
     try {
         const { category, teams, startDate, endDate } = req.query;
-        let match = { start_produce_time: { $exists: true, $ne: null } };
 
-        if (category && category !== 'ALL') match.project_category = new RegExp(category, 'i');
+        // Helper: convert a YYYY-MM-DD string to the UTC range for that full Beijing day
+        const getBeijingDayRange = (dateStr) => {
+            const beijingDate = new Date(`${dateStr}T00:00:00+08:00`);
+            const startUTC = new Date(beijingDate.toISOString());
+            const endUTC = new Date(beijingDate);
+            endUTC.setDate(endUTC.getDate() + 1);
+            endUTC.setMilliseconds(-1);
+            return { startUTC, endUTC };
+        };
 
+        // Base match for ALL queries (category + teams)
+        let baseMatch = { start_produce_time: { $exists: true, $ne: null } };
+        if (category && category !== 'ALL') {
+            baseMatch.project_category = new RegExp(category, 'i');
+        }
         if (teams && teams !== 'ALL') {
             if (teams === '___NONE___') {
-                match.producer = { $in: [] };
+                baseMatch.producer = { $in: [] };
             } else {
                 const teamArray = teams.split(',');
                 const mappings = await TeamMap.find({ teamName: { $in: teamArray } }).lean();
-                match.producer = { $in: mappings.map(m => m.username) };
+                baseMatch.producer = { $in: mappings.map(m => m.username) };
             }
         }
 
+        // --- 1. Summary query (respects date range, if provided) ---
+        let summaryMatch = { ...baseMatch };
         if (startDate && endDate) {
-            match.start_produce_time = {
-                $gte: new Date(`${startDate}T00:00:00.000Z`),
-                $lte: new Date(`${endDate}T23:59:59.999Z`)
+            const startRange = getBeijingDayRange(startDate);
+            const endRange = getBeijingDayRange(endDate);
+            summaryMatch.start_produce_time = {
+                $gte: startRange.startUTC,
+                $lte: endRange.endUTC
             };
         }
 
-        // 1. Global Summary Stats
         const statsPromise = AllRecord.aggregate([
-            { $match: match },
+            { $match: summaryMatch },
             { $addFields: { safe_video_duration: { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } } } },
             {
                 $group: {
@@ -44,19 +59,29 @@ export const getDashboardSummary = async (req, res) => {
             }
         ]);
 
-        // 2. Daily Trend (Last 10 Days)
+        // --- 2. Trend query (always last 10 days, no date range filter) ---
+        // Uses Beijing date grouping WITHOUT any startDate/endDate restriction.
+        const trendMatch = { ...baseMatch };  // no date filter added
+
         const trendPromise = AllRecord.aggregate([
-            { $match: match },
+            { $match: trendMatch },
             {
                 $addFields: {
                     safe_video_duration: { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } },
-                    logical_day: { $dateToString: { format: "%Y-%m-%d", date: { $subtract: [{ $subtract: ["$start_produce_time", 2.5 * 60 * 60 * 1000] }, 6 * 60 * 60 * 1000] } } }
+                    // Extract date in Asia/Shanghai timezone
+                    beijing_date: {
+                        $dateToString: {
+                            format: "%Y-%m-%d",
+                            date: "$start_produce_time",
+                            timezone: "Asia/Shanghai"
+                        }
+                    }
                 }
             },
             {
                 $group: {
-                    _id: "$logical_day",
-                    uniqueProducers: { $addToSet: "$producer" }, // <-- NEW: Collects unique producers
+                    _id: "$beijing_date",
+                    uniqueProducers: { $addToSet: "$producer" },
                     totalCount: { $sum: 1 },
                     totalHours: { $sum: "$safe_video_duration" },
                     acceptedCount: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_PASSED"] }, 1, 0] } },
@@ -67,7 +92,7 @@ export const getDashboardSummary = async (req, res) => {
                     pendingHours: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_WAITING"] }, "$safe_video_duration", 0] } }
                 }
             },
-            { $sort: { _id: -1 } },
+            { $sort: { _id: -1 } },  // latest date first
             { $limit: 10 }
         ]);
 
@@ -80,7 +105,7 @@ export const getDashboardSummary = async (req, res) => {
 
         const formattedTrend = trendResult.map(day => ({
             date: day._id,
-            activeProducers: day.uniqueProducers ? day.uniqueProducers.length : 0, // <-- NEW: Count the array length
+            activeProducers: day.uniqueProducers ? day.uniqueProducers.length : 0,
             total: { count: day.totalCount, hours: day.totalHours / 3600 },
             accepted: { count: day.acceptedCount, hours: day.acceptedHours / 3600 },
             rejected: { count: day.rejectedCount, hours: day.rejectedHours / 3600 },
