@@ -51,19 +51,19 @@ export default function SyncDataPage() {
     // We then create a temporary hidden <a> tag in the DOM, attach the blob's URL to it, click it programmatically, and remove it.
     const handleDownloadCSV = () => {
         setIsDownloadingCSV(true);
-        
+
         try {
             // Because it's a GET request that returns an attachment stream, 
             // we can trigger it instantly by simulating a native browser navigation.
             // This uses ZERO browser memory, no matter how big the CSV gets.
             window.location.href = `${API_URL}/api/backups/csv`;
-            
+
             // Just resetting the button visually after a short delay 
             // since the browser handles the actual download in the background.
             setTimeout(() => {
                 setIsDownloadingCSV(false);
             }, 2000);
-            
+
         } catch (error) {
             console.error("Failed to trigger CSV download", error);
             setIsDownloadingCSV(false);
@@ -75,7 +75,11 @@ export default function SyncDataPage() {
         return new Date(isoString).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' });
     };
 
-    const handleTaskSync = () => startTaskSync([{ id: PROJECTS.OFFICE, category: 'OFFICE', name: 'Office Tasks' }, { id: PROJECTS.HOUSE, category: 'HOUSE', name: 'House Tasks' }]);
+    const handleTaskSync = () => startTaskSync([
+        { id: PROJECTS.OFFICE, category: 'OFFICE', name: 'Office Tasks' },
+        { id: PROJECTS.HOUSE, category: 'HOUSE', name: 'House Tasks' },
+        { id: PROJECTS.GYM, category: 'GYM', name: 'Gym Tasks' }
+    ]);
     const handleQcSync = () => startQcSync([{ id: PROJECTS.OFFICE, category: 'OFFICE', name: 'Office Tasks' }, { id: PROJECTS.HOUSE, category: 'HOUSE', name: 'House Tasks' }]);
 
     const translationPercent = translationData.total > 0 ? Math.round((translationData.processed / translationData.total) * 100) : 0;
@@ -173,12 +177,12 @@ export default function SyncDataPage() {
                             <div className="icon-badge success"><HardDrive size={20} /></div>
                             <h3 style={{ margin: 0, color: 'var(--text-main)', fontSize: '18px' }}>Local Data Vault</h3>
                         </div>
-                        
+
                         {/* BUTTON CONTAINER FOR CSV AND BACKUP */}
                         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                            <button 
-                                className="create-backup-btn" 
-                                onClick={handleDownloadCSV} 
+                            <button
+                                className="create-backup-btn"
+                                onClick={handleDownloadCSV}
                                 disabled={isDownloadingCSV || syncState === 'syncing'}
                                 style={{ backgroundColor: 'var(--bg-main)', color: 'var(--text-main)', border: '1px solid var(--border-color)' }}
                             >

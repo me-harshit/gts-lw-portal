@@ -5,10 +5,8 @@ const appConfigSchema = new mongoose.Schema({
     
     lightwheelToken: { type: String, default: '' },
     lightwheelUsername: { type: String, default: '' },
-    lightwheelQcApi: { type: String, default: 'https://data.lightwheel.net/api/humancase/v1/qc-export' },
-    lightwheelTaskApi: { type: String, default: 'https://data.lightwheel.net/api/humancase/v1/human-task/list' },
-    
-    // We can also store the Last Global Sync timestamps here later!
+    lightwheelQcApi: { type: String, default: '' },
+    lightwheelTaskApi: { type: String, default: '' },
     lastQcSync: { type: Date, default: null },
     lastTaskSync: { type: Date, default: null }
 }, {
