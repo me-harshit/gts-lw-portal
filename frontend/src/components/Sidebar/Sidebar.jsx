@@ -14,7 +14,7 @@ import {
   BarChart3,
   ClipboardCheck,
   Cog,
-  ListChecks 
+  ListChecks
 } from 'lucide-react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -111,48 +111,42 @@ export default function Sidebar() {
           </button>
         </div>
 
-        {/* ======================================================
-            QUALITY CONTROL
-            ACCESS: CORE TEAM + ADMIN
-        ====================================================== */}
-        {isCoreOrAdmin && (
-          <div className="sidebar-section">
-            <div className="sidebar-title">
-              <ClipboardCheck size={14} />
-              <span>QUALITY CONTROL</span>
-            </div>
-
-            <button
-              className={`nav-button ${isActive('/qc') ? 'active' : ''}`}
-              onClick={() => navigate('/qc')}
-            >
-              <ShieldAlert size={18} className="nav-icon" />
-              <span>QC Hub</span>
-            </button>
-
-            <button
-              className={`nav-button ${isActive('/qc-leaderboard') ? 'active' : ''}`}
-              onClick={() => navigate('/qc-leaderboard')}
-            >
-              <Trophy size={18} className="nav-icon" />
-              <span>QC Leaderboard</span>
-            </button>
-
-            <button
-              className={`nav-button ${isActive('/anomalies') ? 'active' : ''}`}
-              onClick={() => navigate('/anomalies')}
-            >
-              <AlertTriangle size={18} className="nav-icon" />
-              <span>Anomaly Tracker</span>
-            </button>
+        <div className="sidebar-section">
+          <div className="sidebar-title">
+            <ClipboardCheck size={14} />
+            <span>QUALITY CONTROL</span>
           </div>
-        )}
+
+          <button
+            className={`nav-button ${isActive('/qc') ? 'active' : ''}`}
+            onClick={() => navigate('/qc')}
+          >
+            <ShieldAlert size={18} className="nav-icon" />
+            <span>QC Hub</span>
+          </button>
+
+          <button
+            className={`nav-button ${isActive('/qc-leaderboard') ? 'active' : ''}`}
+            onClick={() => navigate('/qc-leaderboard')}
+          >
+            <Trophy size={18} className="nav-icon" />
+            <span>QC Leaderboard</span>
+          </button>
+
+          <button
+            className={`nav-button ${isActive('/anomalies') ? 'active' : ''}`}
+            onClick={() => navigate('/anomalies')}
+          >
+            <AlertTriangle size={18} className="nav-icon" />
+            <span>Anomaly Tracker</span>
+          </button>
+        </div>
 
         {/* ======================================================
             MANAGEMENT
             ACCESS: ADMIN
         ====================================================== */}
-        {isAdmin && (
+        {isCoreOrAdmin &&  (
           <div className="sidebar-section">
             <div className="sidebar-title">
               <Users size={14} />

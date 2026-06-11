@@ -91,33 +91,18 @@ export default function App() {
                         <Route path="/dashboard" element={<ProjectDashboard />} />
                         <Route path="/leaderboard" element={<AcceptanceLeaderboard />} />
                         <Route path="/performance" element={<PerformanceLeaderboard />} />
-                        <Route path="/producer-analytics" element={<ProducerAnalytics />} /> {/* <-- ADDED ROUTE */}
+                        <Route path="/producer-analytics" element={<ProducerAnalytics />} />
+                        <Route path="/qc" element={<QcDashboard />} />
+                        <Route path="/qc-leaderboard" element={<QcLeaderboard />} />
+                        <Route path="/anomalies" element={<AnomalyDashboard />} />
 
-                        {/* QUALITY CONTROL (Access: Core Team + Admin) */}
-                        <Route path="/qc" element={
-                            <ProtectedRoute allowedRoles={['ADMIN', 'CORE_TEAM']}>
-                              <QcDashboard />
-                            </ProtectedRoute>
-                        } />
-                        <Route path="/qc-leaderboard" element={
-                            <ProtectedRoute allowedRoles={['ADMIN', 'CORE_TEAM']}>
-                              <QcLeaderboard />
-                            </ProtectedRoute>
-                        } />
-                        <Route path="/anomalies" element={
-                            <ProtectedRoute allowedRoles={['ADMIN', 'CORE_TEAM']}>
-                              <AnomalyDashboard />
-                            </ProtectedRoute>
-                        } />
-
-                        {/* MANAGEMENT (Access: Admin) */}
                         <Route path="/teams" element={
-                            <ProtectedRoute allowedRoles={['ADMIN']}>
+                            <ProtectedRoute allowedRoles={['ADMIN', 'CORE_TEAM']}>
                               <TeamManagement />
                             </ProtectedRoute>
                         } />
                         <Route path="/attendance" element={
-                            <ProtectedRoute allowedRoles={['ADMIN']}>
+                            <ProtectedRoute allowedRoles={['ADMIN', 'CORE_TEAM']}>
                               <AttendanceDashboard />
                             </ProtectedRoute>
                         } />
