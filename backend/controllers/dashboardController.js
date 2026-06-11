@@ -78,7 +78,7 @@ export const triggerDashboardSync = async (req, res) => {
                             throw new Error('Lightwheel Token Expired! Please refresh in Admin Settings.');
                         }
                         if (createAttempts >= 10) throw new Error(`Failed to create export for ${proj.name} after 10 attempts.`);
-                        
+
                         // IF RATE LIMITED OR SERVER ERROR, WAIT 30 MINS
                         if (err.response && (err.response.status === 429 || err.response.status >= 500)) {
                             updateSyncState({ message: `${prefix}Rate Limited on Create. Pausing 30 mins... (Attempt ${createAttempts}/10)` });
@@ -101,7 +101,7 @@ export const triggerDashboardSync = async (req, res) => {
                         listAttempts++;
                         // Wait a base time of 30 seconds between checks so we don't spam the server
                         await new Promise(resolve => setTimeout(resolve, 30000));
-                        
+
                         updateSyncState({ message: `${prefix}Checking ZIP Status... (Attempt ${listAttempts}/10)` });
 
                         const listRes = await axios.post(
@@ -109,7 +109,7 @@ export const triggerDashboardSync = async (req, res) => {
                             { page: 1, pageSize: 20 },
                             { headers: getHeaders(config), httpsAgent, timeout: 60000 }
                         );
-                        
+
                         const match = listRes.data.data.find(item => item.id === exportId);
                         if (match && match.downloadUrl) {
                             downloadUrl = match.downloadUrl;
@@ -119,7 +119,7 @@ export const triggerDashboardSync = async (req, res) => {
                             throw new Error('Lightwheel Token Expired! Please refresh in Admin Settings.');
                         }
                         if (listAttempts >= 10) throw new Error(`${proj.name} Export Timeout: ZIP never finished after 10 checks.`);
-                        
+
                         // IF RATE LIMITED, WAIT 30 MINS
                         if (pollError.response && (pollError.response.status === 429 || pollError.response.status >= 500)) {
                             updateSyncState({ message: `${prefix}Rate Limited on Check. Pausing 30 mins... (Attempt ${listAttempts}/10)` });
@@ -153,7 +153,7 @@ export const triggerDashboardSync = async (req, res) => {
                         });
                     } catch (err) {
                         if (downloadAttempts >= 10) throw new Error(`Failed to download ${proj.name} after 10 attempts.`);
-                        
+
                         // IF RATE LIMITED, WAIT 30 MINS
                         if (err.response && (err.response.status === 429 || err.response.status >= 500)) {
                             updateSyncState({ message: `${prefix}Rate Limited on Download. Pausing 30 mins... (Attempt ${downloadAttempts}/10)` });
@@ -179,7 +179,7 @@ export const triggerDashboardSync = async (req, res) => {
                 // --- HELPER TO PROCESS BATCHES WITH ANOMALY DETECTION ---
                 const processBatch = async (rows) => {
                     if (rows.length === 0) return;
-                    
+
                     const dataNames = rows.map(r => r.data_name);
                     const existingRecords = await AllRecord.find({ data_name: { $in: dataNames } }).lean();
                     const existingMap = new Map(existingRecords.map(r => [r.data_name, r]));
@@ -189,7 +189,7 @@ export const triggerDashboardSync = async (req, res) => {
                         const localRecord = existingMap.get(row.data_name);
                         let updateDoc = { ...row, project_category: proj.category };
                         let pushHistory = null;
-                        
+
                         const vDuration = parseFloat(row.video_duration) || 0;
 
                         if (localRecord) {
@@ -198,13 +198,13 @@ export const triggerDashboardSync = async (req, res) => {
 
                                 if (localRecord.inspect_result === 'INSPECT_PASSED' && row.inspect_result !== 'INSPECT_PASSED') {
                                     console.warn(`🚨 [Anomaly] Downgrade Detected: ${row.data_name}`);
-                                    updateDoc.is_downgraded = true; 
+                                    updateDoc.is_downgraded = true;
                                 }
                             }
 
                             if (localRecord.inspect_result !== 'INSPECT_PASSED' && row.inspect_result === 'INSPECT_PASSED') {
                                 updateDoc.locked_duration = vDuration;
-                                updateDoc.is_downgraded = false; 
+                                updateDoc.is_downgraded = false;
                             }
                         } else {
                             if (row.inspect_result === 'INSPECT_PASSED') {
@@ -272,7 +272,7 @@ export const triggerDashboardSync = async (req, res) => {
 // ============================================================================
 
 let isTranslationRunning = false;
-let cancelTranslationFlag = false; 
+let cancelTranslationFlag = false;
 
 export const translationState = {
     isRunning: false,
@@ -459,31 +459,45 @@ export const stopTranslation = (req, res) => {
 export const getAnomalies = async (req, res) => {
     try {
         const { startDate, endDate, page = 1, limit = 50, type = 'DOWNGRADED' } = req.query;
-        let query = {};
+        let baseQuery = {};
 
-        // Define query based on anomaly type
         if (type === 'ZERO_DURATION') {
-            // Find records where duration is 0, null, or missing
-            query = { 
+            baseQuery = {
                 $or: [
-                    { video_duration: 0 }, 
-                    { video_duration: null }, 
+                    { video_duration: 0 },
+                    { video_duration: "0" },
+                    { video_duration: null },
                     { video_duration: { $exists: false } }
-                ] 
+                ]
             };
         } else {
-            query = { is_downgraded: true };
+            baseQuery = { is_downgraded: true };
         }
 
-        // Apply Date Filters
-        if (startDate && endDate) {
-            const start = new Date(`${startDate}T00:00:00.000Z`);
-            const end = new Date(`${endDate}T23:59:59.999Z`);
-            // Use different date fields based on the anomaly context
+        let query = { ...baseQuery };
+
+        // Apply Date Filters strictly in Beijing Time (+08:00)
+        if (startDate || endDate) {
+            const dateQuery = {};
+            if (startDate) dateQuery.$gte = new Date(`${startDate}T00:00:00.000+08:00`);
+            if (endDate) dateQuery.$lte = new Date(`${endDate}T23:59:59.999+08:00`);
+
             if (type === 'ZERO_DURATION') {
-                query.start_produce_time = { $gte: start, $lte: end };
+                // Matches the exact fallback logic used in the UI
+                query = {
+                    $and: [
+                        baseQuery,
+                        {
+                            $or: [
+                                { start_produce_time: dateQuery },
+                                { start_produce_time: null, createdAt: dateQuery },
+                                { start_produce_time: { $exists: false }, createdAt: dateQuery }
+                            ]
+                        }
+                    ]
+                };
             } else {
-                query.updatedAt = { $gte: start, $lte: end };
+                query.updatedAt = dateQuery;
             }
         }
 
@@ -491,7 +505,6 @@ export const getAnomalies = async (req, res) => {
         const totalRecords = await AllRecord.countDocuments(query);
         const totalPages = Math.ceil(totalRecords / Number(limit));
 
-        // Only calculate lost seconds for Downgraded records
         let totalLostSeconds = 0;
         if (type === 'DOWNGRADED') {
             const aggregation = await AllRecord.aggregate([
@@ -504,17 +517,17 @@ export const getAnomalies = async (req, res) => {
         const sortField = type === 'ZERO_DURATION' ? { start_produce_time: -1 } : { updatedAt: -1 };
 
         const anomalies = await AllRecord.find(query)
-            .select('data_name producer project_category locked_duration inspect_result status_history updatedAt start_produce_time video_duration task_name')
+            .select('data_name data_name_en producer project_category locked_duration inspect_result inspect_issue_description inspect_issue_description_en status_history updatedAt createdAt start_produce_time video_duration task_name task_name_en')
             .sort(sortField)
             .skip(skip)
             .limit(Number(limit));
-            
-        res.json({ 
-            anomalies, 
-            totalPages, 
-            currentPage: Number(page), 
+
+        res.json({
+            anomalies,
+            totalPages,
+            currentPage: Number(page),
             totalRecords,
-            totalLostSeconds 
+            totalLostSeconds
         });
 
     } catch (error) {

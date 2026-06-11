@@ -8,12 +8,11 @@ import './AnomalyDashboard.css';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export default function AnomalyDashboard() {
-    const [anomalyType, setAnomalyType] = useState('DOWNGRADED'); // 'DOWNGRADED' | 'ZERO_DURATION'
+    const [anomalyType, setAnomalyType] = useState('DOWNGRADED'); 
     const [anomalies, setAnomalies] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isExporting, setIsExporting] = useState(false);
     
-    // Filters & Pagination
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [activeFilterBtn, setActiveFilterBtn] = useState('');
@@ -23,33 +22,59 @@ export default function AnomalyDashboard() {
     const [globalLostSeconds, setGlobalLostSeconds] = useState(0); 
     const limit = 50; 
 
+    // --- STRICT BEIJING DISPLAY FORMATTER ---
+    const formatAnomalyDate = (dateVal) => {
+        if (!dateVal) return 'Unknown';
+        const d = new Date(dateVal);
+        if (isNaN(d.getTime())) return 'Unknown';
+        // Force rendering in CST (UTC+8) regardless of where the user is
+        return d.toLocaleString('en-US', { 
+            timeZone: 'Asia/Shanghai', 
+            dateStyle: 'medium', 
+            timeStyle: 'short' 
+        });
+    };
+
+    // --- STRICT BEIJING CALENDAR FILTER ---
+    const getBeijingDateStr = (dateObj) => {
+        // 'en-CA' outputs YYYY-MM-DD universally
+        return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(dateObj);
+    };
+
     const applyQuickFilter = (type) => {
         setActiveFilterBtn(type);
         setPage(1); 
         const today = new Date();
-        
-        const formatDate = (date) => {
-            const yyyy = date.getFullYear();
-            const mm = String(date.getMonth() + 1).padStart(2, '0');
-            const dd = String(date.getDate()).padStart(2, '0');
-            return `${yyyy}-${mm}-${dd}`;
-        };
 
         if (type === 'today') {
-            setStartDate(formatDate(today)); setEndDate(formatDate(today));
+            const todayStr = getBeijingDateStr(today);
+            setStartDate(todayStr); setEndDate(todayStr);
         } else if (type === 'yesterday') {
             const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
-            setStartDate(formatDate(yesterday)); setEndDate(formatDate(yesterday));
+            const yestStr = getBeijingDateStr(yesterday);
+            setStartDate(yestStr); setEndDate(yestStr);
         } else if (type === 'thisWeek') {
-            const monday = new Date(today); const day = monday.getDay() || 7; monday.setDate(monday.getDate() - (day - 1));
-            setStartDate(formatDate(monday)); setEndDate(formatDate(today));
+            const monday = new Date(today); 
+            const day = monday.getDay() || 7; 
+            monday.setDate(monday.getDate() - (day - 1));
+            setStartDate(getBeijingDateStr(monday)); 
+            setEndDate(getBeijingDateStr(today));
         } else if (type === 'thisMonth') {
-            const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-            setStartDate(formatDate(firstDay)); setEndDate(formatDate(today));
+            // Extract the correct Year & Month currently active in Beijing
+            const beijingParts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit' }).formatToParts(today);
+            const y = beijingParts.find(p => p.type === 'year').value;
+            const m = beijingParts.find(p => p.type === 'month').value;
+            
+            setStartDate(`${y}-${m}-01`); 
+            setEndDate(getBeijingDateStr(today));
         } else if (type === 'allTime') {
             setStartDate(''); setEndDate('');
         }
     };
+
+    useEffect(() => {
+        applyQuickFilter('thisMonth');
+    }, []); // Runs once on mount
 
     const handleManualDateChange = (setter, value) => {
         setActiveFilterBtn('');
@@ -57,7 +82,6 @@ export default function AnomalyDashboard() {
         setPage(1); 
     };
 
-    // Reset pagination when switching tabs
     const handleTabChange = (type) => {
         setAnomalyType(type);
         setPage(1);
@@ -68,7 +92,7 @@ export default function AnomalyDashboard() {
             setIsLoading(true);
             try {
                 let url = `${API_URL}/api/dashboard/anomalies?type=${anomalyType}&page=${page}&limit=${limit}`;
-                if (startDate && endDate) {
+                if (startDate || endDate) {
                     url += `&startDate=${startDate}&endDate=${endDate}`;
                 }
                 const res = await axios.get(url);
@@ -89,7 +113,7 @@ export default function AnomalyDashboard() {
         setIsExporting(true);
         try {
             let url = `${API_URL}/api/dashboard/anomalies?type=${anomalyType}&page=1&limit=50000`;
-            if (startDate && endDate) {
+            if (startDate || endDate) {
                 url += `&startDate=${startDate}&endDate=${endDate}`;
             }
             const res = await axios.get(url);
@@ -108,14 +132,12 @@ export default function AnomalyDashboard() {
     return (
         <div className="dashboard-card anomaly-dashboard-container">
             
-            {/* Header Section */}
             <div className="anomaly-header-section">
                 <div className="anomaly-header-left">
                     <h2 className="anomaly-header-title">
                         <AlertTriangle size={28} /> QC Anomaly Tracker
                     </h2>
                     
-                    {/* --- TABS FOR ANOMALY TYPES --- */}
                     <div className="anomaly-tabs">
                         <button 
                             className={`anomaly-tab-btn ${anomalyType === 'DOWNGRADED' ? 'active' : ''}`}
@@ -164,7 +186,6 @@ export default function AnomalyDashboard() {
                 }
             </p>
 
-            {/* Dynamic Stats Cards */}
             <div className="anomaly-stats-grid">
                 <div className={`anomaly-stat-card ${anomalyType === 'ZERO_DURATION' ? 'warning' : 'danger'}`}>
                     <div className="anomaly-stat-label">
@@ -186,12 +207,11 @@ export default function AnomalyDashboard() {
                 )}
             </div>
 
-            {/* Dynamic Table */}
             <div className="anomaly-table-wrapper">
                 <table className="anomaly-table">
                     <thead>
                         <tr>
-                            <th>Video ID</th>
+                            <th>Video ID & Name</th>
                             <th>Producer</th>
                             {anomalyType === 'DOWNGRADED' ? (
                                 <>
@@ -217,19 +237,19 @@ export default function AnomalyDashboard() {
                                 let dateStr = 'Unknown';
                                 if (anomalyType === 'DOWNGRADED') {
                                     if (anom.status_history?.length > 0) {
-                                        dateStr = new Date(anom.status_history[anom.status_history.length - 1].changedAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
-                                    } else if (anom.updatedAt) {
-                                        dateStr = new Date(anom.updatedAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+                                        dateStr = formatAnomalyDate(anom.status_history[anom.status_history.length - 1].changedAt);
+                                    } else {
+                                        dateStr = formatAnomalyDate(anom.updatedAt);
                                     }
                                 } else {
-                                    if (anom.start_produce_time) {
-                                        dateStr = new Date(anom.start_produce_time).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
-                                    }
+                                    dateStr = formatAnomalyDate(anom.start_produce_time || anom.createdAt || anom.updatedAt);
                                 }
 
                                 return (
                                     <tr key={anom._id}>
-                                        <td className="anomaly-id-cell">{anom.data_name}</td>
+                                        <td className="anomaly-id-cell">
+                                            {anom.data_name_en || anom.data_name}
+                                        </td>
                                         <td className="anomaly-producer-cell">{anom.producer}</td>
                                         
                                         {anomalyType === 'DOWNGRADED' ? (
@@ -239,14 +259,14 @@ export default function AnomalyDashboard() {
                                                 </td>
                                                 <td className="text-center">
                                                     <span className="anomaly-status-badge">
-                                                        {anom.inspect_result?.replace('INSPECT_', '')}
+                                                        {anom.inspect_result?.replace('INSPECT_', '') || 'UNKNOWN'}
                                                     </span>
                                                 </td>
                                             </>
                                         ) : (
                                             <>
                                                 <td>
-                                                    <div style={{ fontWeight: '500', color: 'var(--text-main)' }}>{anom.task_name || 'Unknown Task'}</div>
+                                                    <div style={{ fontWeight: '500', color: 'var(--text-main)' }}>{anom.task_name_en || anom.task_name || 'Unknown Task'}</div>
                                                     <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{anom.project_category}</div>
                                                 </td>
                                                 <td className="text-center" style={{ color: '#ef4444', fontWeight: 'bold' }}>
@@ -254,7 +274,7 @@ export default function AnomalyDashboard() {
                                                 </td>
                                                 <td className="text-center">
                                                     <span className={`anomaly-status-badge ${anom.inspect_result === 'INSPECT_PASSED' ? 'passed' : anom.inspect_result === 'INSPECT_WAITING' ? 'pending' : ''}`}>
-                                                        {anom.inspect_result?.replace('INSPECT_', '')}
+                                                        {anom.inspect_result?.replace('INSPECT_', '') || 'UNKNOWN'}
                                                     </span>
                                                 </td>
                                             </>
