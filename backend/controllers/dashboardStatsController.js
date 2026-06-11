@@ -18,24 +18,24 @@ export const getDashboardSummary = async (req, res) => {
             }
         }
 
-        // 1. SUMMARY CARDS: Fixed to Last 10 Days in Beijing Time
-        const bjgNow = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Shanghai"}));
-        const bjg10DaysAgo = new Date(bjgNow);
-        bjg10DaysAgo.setDate(bjg10DaysAgo.getDate() - 9);
-        const startOf10DaysStr = `${bjg10DaysAgo.getFullYear()}-${String(bjg10DaysAgo.getMonth() + 1).padStart(2, '0')}-${String(bjg10DaysAgo.getDate()).padStart(2, '0')}T00:00:00.000+08:00`;
-        
-        const statsMatch = { ...baseMatch, start_produce_time: { $gte: new Date(startOf10DaysStr) } };
-
-        // 2. TREND TABLE: Listens to UI Date Filter (Strict Beijing Time)
-        let trendMatch = { ...baseMatch };
+        // 1. TOP STATS CARDS: Listens to UI Date Filters (Strict Beijing Time +08:00)
+        let statsMatch = { ...baseMatch };
         if (startDate && endDate) {
-            trendMatch.start_produce_time = {
+            statsMatch.start_produce_time = {
                 $gte: new Date(`${startDate}T00:00:00.000+08:00`),
                 $lte: new Date(`${endDate}T23:59:59.999+08:00`)
             };
         }
 
-        // Aggregate Summary Cards
+        // 2. DAILY TREND TABLE: Permanently locked to Last 10 Days in Beijing Time
+        const bjgNow = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Shanghai"}));
+        const bjg10DaysAgo = new Date(bjgNow);
+        bjg10DaysAgo.setDate(bjg10DaysAgo.getDate() - 9); 
+        const startOf10DaysStr = `${bjg10DaysAgo.getFullYear()}-${String(bjg10DaysAgo.getMonth() + 1).padStart(2, '0')}-${String(bjg10DaysAgo.getDate()).padStart(2, '0')}T00:00:00.000+08:00`;
+        
+        const trendMatch = { ...baseMatch, start_produce_time: { $gte: new Date(startOf10DaysStr) } };
+
+        // Aggregate Top Stats Cards
         const statsPromise = AllRecord.aggregate([
             { $match: statsMatch },
             { $addFields: { safe_video_duration: { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } } } },
@@ -54,13 +54,12 @@ export const getDashboardSummary = async (req, res) => {
             }
         ]);
 
-        // Aggregate Trend Table
+        // Aggregate Daily Trend Table
         const trendPromise = AllRecord.aggregate([
             { $match: trendMatch },
             {
                 $addFields: {
                     safe_video_duration: { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } },
-                    // CRITICAL: Force MongoDB to group days by Beijing Midnight, not UTC
                     bjg_date: { $dateToString: { format: "%Y-%m-%d", date: "$start_produce_time", timezone: "+08:00" } }
                 }
             },
