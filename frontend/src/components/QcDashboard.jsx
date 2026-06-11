@@ -126,6 +126,7 @@ export default function QcDashboard() {
                 ]);
                 
                 setTeamConfigs(configsRes.data);
+                applyQuickFilter('thisMonth');
                 setTags(tagsRes.data.map(t => t.name));
                 setShifts(shiftsRes.data.map(s => s.name));
                 setUserMappings(mapsRes.data);
