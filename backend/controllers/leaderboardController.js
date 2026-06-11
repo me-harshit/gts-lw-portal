@@ -10,8 +10,7 @@ export const getAcceptanceLeaderboard = async (req, res) => {
             inspect_result: { $exists: true }
         };
 
-        // --- NEW SMART FILTERING ---
-        // Convert the requested custom Teams into a list of exact Producer usernames
+        // --- SMART TEAM FILTERING ---
         if (teams && teams !== 'ALL') {
             if (teams === '___NONE___') {
                 initialMatch.producer = { $in: [] };
@@ -23,29 +22,15 @@ export const getAcceptanceLeaderboard = async (req, res) => {
             }
         }
 
-        const pipeline = [{ $match: initialMatch }];
-
-        // TIMEZONE MATH & DATE FILTERING
-        if (startDate && endDate) {
-            pipeline.push({
-                $addFields: {
-                    logical_day_time: {
-                        $subtract: [
-                            { $subtract: ["$start_produce_time", 2.5 * 60 * 60 * 1000] },
-                            6 * 60 * 60 * 1000
-                        ]
-                    }
-                }
-            });
-            pipeline.push({
-                $addFields: {
-                    working_date: { $dateToString: { format: "%Y-%m-%d", date: "$logical_day_time" } }
-                }
-            });
-            pipeline.push({
-                $match: { working_date: { $gte: startDate, $lte: endDate } }
-            });
+        // --- STRICT BEIJING TIME FILTERING (+08:00) ---
+        if (startDate || endDate) {
+            const dateQuery = {};
+            if (startDate) dateQuery.$gte = new Date(`${startDate}T00:00:00.000+08:00`);
+            if (endDate) dateQuery.$lte = new Date(`${endDate}T23:59:59.999+08:00`);
+            initialMatch.start_produce_time = dateQuery;
         }
+
+        const pipeline = [{ $match: initialMatch }];
 
         pipeline.push({
             $addFields: {
@@ -94,46 +79,33 @@ export const getPerformanceLeaderboard = async (req, res) => {
             start_produce_time: { $exists: true, $ne: null }
         };
 
-        // --- NEW SMART FILTERING ---
-        // Convert the requested custom Teams into a list of exact Producer usernames
         if (teams && teams !== 'ALL') {
             if (teams === '___NONE___') {
                 initialMatch.producer = { $in: [] }; 
             } else {
                 const teamArray = teams.split(',');
                 const mappings = await TeamMap.find({ teamName: { $in: teamArray } }).lean();
-                const allowedProducers = mappings.map(m => m.username);
-                initialMatch.producer = { $in: allowedProducers };
+                initialMatch.producer = { $in: mappings.map(m => m.username) };
             }
+        }
+
+        // LEARNING POINT: Filter dates BEFORE doing any transformations. 
+        // This utilizes DB indexes and speeds up the query massively.
+        if (startDate || endDate) {
+            initialMatch.start_produce_time = {};
+            if (startDate) initialMatch.start_produce_time.$gte = new Date(`${startDate}T00:00:00.000+08:00`);
+            if (endDate) initialMatch.start_produce_time.$lte = new Date(`${endDate}T23:59:59.999+08:00`);
         }
 
         const pipeline = [ { $match: initialMatch } ];
 
-        // TIMEZONE MATH
         pipeline.push({
             $addFields: {
-                logical_day_time: {
-                    $subtract: [
-                        { $subtract: ["$start_produce_time", 2.5 * 60 * 60 * 1000] },
-                        6 * 60 * 60 * 1000
-                    ]
-                },
-                safe_video_duration: { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } }
+                safe_video_duration: { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } },
+                // Native timezone grouping
+                working_date: { $dateToString: { format: "%Y-%m-%d", date: "$start_produce_time", timezone: "+08:00" } }
             }
         });
-        
-        pipeline.push({
-            $addFields: {
-                working_date: { $dateToString: { format: "%Y-%m-%d", date: "$logical_day_time" } }
-            }
-        });
-
-        // DATE FILTER
-        if (startDate && endDate) {
-            pipeline.push({
-                $match: { working_date: { $gte: startDate, $lte: endDate } }
-            });
-        }
 
         // GROUP 1: By Producer & Date to get daily duration
         pipeline.push({
@@ -172,6 +144,7 @@ export const getPerformanceLeaderboard = async (req, res) => {
     }
 };
 
+
 export const getQcLeaderboard = async (req, res) => {
     try {
         const { startDate, endDate, teams } = req.query;
@@ -181,57 +154,40 @@ export const getQcLeaderboard = async (req, res) => {
             start_produce_time: { $exists: true, $ne: null }
         };
 
-        // --- 1. SMART TEAM FILTERING ---
         if (teams && teams !== 'ALL') {
             if (teams === '___NONE___') {
                 initialMatch.producer = { $in: [] }; 
             } else {
                 const teamArray = teams.split(',');
                 const mappings = await TeamMap.find({ teamName: { $in: teamArray } }).lean();
-                const allowedProducers = mappings.map(m => m.username);
-                initialMatch.producer = { $in: allowedProducers };
+                initialMatch.producer = { $in: mappings.map(m => m.username) };
             }
+        }
+
+        // Apply strict date boundaries immediately
+        if (startDate || endDate) {
+            initialMatch.start_produce_time = {};
+            if (startDate) initialMatch.start_produce_time.$gte = new Date(`${startDate}T00:00:00.000+08:00`);
+            if (endDate) initialMatch.start_produce_time.$lte = new Date(`${endDate}T23:59:59.999+08:00`);
         }
 
         const pipeline = [ { $match: initialMatch } ];
 
-        // --- 2. TIMEZONE MATH & DATES ---
+        // LEARNING POINT: We deleted working_date entirely. 
+        // If you aren't grouping by day, don't waste CPU calculating it.
         pipeline.push({
             $addFields: {
-                logical_day_time: {
-                    $subtract: [
-                        { $subtract: ["$start_produce_time", 2.5 * 60 * 60 * 1000] },
-                        6 * 60 * 60 * 1000
-                    ]
-                },
-                // Safely parse duration
                 safe_video_duration: { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } }
             }
         });
 
         pipeline.push({
-            $addFields: {
-                working_date: { $dateToString: { format: "%Y-%m-%d", date: "$logical_day_time" } }
-            }
-        });
-
-        if (startDate && endDate) {
-            pipeline.push({
-                $match: { working_date: { $gte: startDate, $lte: endDate } }
-            });
-        }
-
-        // --- 3. AGGREGATE BY PRODUCER ---
-        pipeline.push({
             $group: {
                 _id: "$producer",
-
                 totalVideos: { $sum: 1 },
                 totalDuration: { $sum: "$safe_video_duration" },
-
                 passedVideos: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_PASSED"] }, 1, 0] } },
                 passedDuration: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_PASSED"] }, "$safe_video_duration", 0] } },
-
                 failedVideos: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_FAILED"] }, 1, 0] } },
                 failedDuration: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_FAILED"] }, "$safe_video_duration", 0] } }
             }
@@ -239,21 +195,18 @@ export const getQcLeaderboard = async (req, res) => {
 
         const leaderboard = await AllRecord.aggregate(pipeline);
 
-        // --- 4. ENRICH DATA & CALCULATE DURATION-BASED RATES ---
         const enrichedData = leaderboard.map(producer => {
             const checkedVideos = producer.passedVideos + producer.failedVideos;
             const checkedDuration = producer.passedDuration + producer.failedDuration;
 
             const waitingVideos = producer.totalVideos - checkedVideos;
-            const waitingDuration = Math.max(0, producer.totalDuration - checkedDuration); // Math.max prevents floating-point negative errors
+            const waitingDuration = Math.max(0, producer.totalDuration - checkedDuration); 
 
-            // IMPORTANT: Rates are now accurately based on Video Duration, not Video Count
             const passRate = checkedDuration > 0 ? ((producer.passedDuration / checkedDuration) * 100).toFixed(2) : '0.00';
             const failRate = checkedDuration > 0 ? ((producer.failedDuration / checkedDuration) * 100).toFixed(2) : '0.00';
             const waitRate = producer.totalDuration > 0 ? ((waitingDuration / producer.totalDuration) * 100).toFixed(2) : '0.00';
 
             return {
-                // Return 'producer' as the username for frontend consistency
                 username: producer._id || 'Unknown',
                 totalVideos: producer.totalVideos,
                 totalDuration: producer.totalDuration,
@@ -271,7 +224,6 @@ export const getQcLeaderboard = async (req, res) => {
             };
         });
 
-        // 5. Sort by Pass Rate first, then total volume as a tie-breaker
         enrichedData.sort((a, b) => {
             const rateDiff = parseFloat(b.passRate) - parseFloat(a.passRate);
             if (rateDiff !== 0) return rateDiff;

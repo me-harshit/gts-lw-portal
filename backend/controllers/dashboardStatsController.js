@@ -199,7 +199,6 @@ export const getProducerHistory = async (req, res) => {
     }
 };
 
-
 export const getQcDetails = async (req, res) => {
     const { startDate, endDate, teams, viewMode = 'BY_PRODUCER', producer, reason, taskId } = req.query;
 
@@ -217,11 +216,11 @@ export const getQcDetails = async (req, res) => {
             }
         }
 
-        // 2. Date Filters
+        // 2. Date Filters (Strict Beijing Time +08:00)
         if (startDate && endDate) {
             initialMatch.start_produce_time = {
-                $gte: new Date(`${startDate}T00:00:00.000Z`),
-                $lte: new Date(`${endDate}T23:59:59.999Z`)
+                $gte: new Date(`${startDate}T00:00:00.000+08:00`),
+                $lte: new Date(`${endDate}T23:59:59.999+08:00`)
             };
         }
 

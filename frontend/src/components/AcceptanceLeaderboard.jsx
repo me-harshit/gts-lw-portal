@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useQuery } from '@tanstack/react-query';
 import { Filter, Calendar, Loader2, Trophy, ChevronDown, Tag as TagIcon, Clock, Users } from 'lucide-react';
 import { formatDuration } from '../utils/timeFormat';
-import './TaskDashboard.css'; 
+import './TaskDashboard.css';
 import './AcceptanceLeaderboard.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -58,7 +58,7 @@ export default function AcceptanceLeaderboard() {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [activeFilterBtn, setActiveFilterBtn] = useState('thisMonth');
-    
+
     // Metadata Filters
     const [activeTag, setActiveTag] = useState('ALL');
     const [activeShift, setActiveShift] = useState('ALL');
@@ -80,7 +80,7 @@ export default function AcceptanceLeaderboard() {
                     axios.get(`${API_URL}/api/teams/shifts`),
                     axios.get(`${API_URL}/api/teams`)
                 ]);
-                
+
                 setTeamConfigs(configsRes.data);
                 applyQuickFilter('thisMonth');
                 setTags(tagsRes.data.map(t => t.name));
@@ -92,23 +92,34 @@ export default function AcceptanceLeaderboard() {
         fetchMetadata();
     }, []);
 
-    // --- QUICK FILTER LOGIC ---
+    // Helper to strictly grab Beijing dates
+    const getBeijingDateStr = (dateObj) => {
+        return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(dateObj);
+    };
+
     const applyQuickFilter = (type) => {
         setActiveFilterBtn(type);
         const today = new Date();
-        const formatDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
         if (type === 'today') {
-            setStartDate(formatDate(today)); setEndDate(formatDate(today));
+            const todayStr = getBeijingDateStr(today);
+            setStartDate(todayStr); setEndDate(todayStr);
         } else if (type === 'yesterday') {
             const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
-            setStartDate(formatDate(yesterday)); setEndDate(formatDate(yesterday));
+            const yestStr = getBeijingDateStr(yesterday);
+            setStartDate(yestStr); setEndDate(yestStr);
         } else if (type === 'thisWeek') {
-            const monday = new Date(today); const day = monday.getDay() || 7; monday.setDate(monday.getDate() - (day - 1));
-            setStartDate(formatDate(monday)); setEndDate(formatDate(today));
+            const monday = new Date(today);
+            const day = monday.getDay() || 7;
+            monday.setDate(monday.getDate() - (day - 1));
+            setStartDate(getBeijingDateStr(monday));
+            setEndDate(getBeijingDateStr(today));
         } else if (type === 'thisMonth') {
-            const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-            setStartDate(formatDate(firstDay)); setEndDate(formatDate(today));
+            const beijingParts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit' }).formatToParts(today);
+            const y = beijingParts.find(p => p.type === 'year').value;
+            const m = beijingParts.find(p => p.type === 'month').value;
+            setStartDate(`${y}-${m}-01`);
+            setEndDate(getBeijingDateStr(today));
         } else if (type === 'allTime') {
             setStartDate(''); setEndDate('');
         }
@@ -129,14 +140,14 @@ export default function AcceptanceLeaderboard() {
 
             let teamQuery = 'ALL';
             if ((activeTag !== 'ALL' || activeShift !== 'ALL' || teamCategory !== 'ALL') && matchingTeams.length === 0) {
-                teamQuery = '___NONE___'; 
+                teamQuery = '___NONE___';
             } else if (activeTag !== 'ALL' || activeShift !== 'ALL' || teamCategory !== 'ALL') {
                 teamQuery = matchingTeams.map(t => t.name).join(',');
             }
 
             let url = `${API_URL}/api/leaderboards/acceptance?teams=${teamQuery}`;
             if (startDate && endDate) url += `&startDate=${startDate}&endDate=${endDate}`;
-            
+
             const res = await axios.get(url);
             return res.data;
         },
@@ -168,12 +179,12 @@ export default function AcceptanceLeaderboard() {
 
     return (
         <div className="dashboard-card" style={{ maxWidth: '1400px', margin: '0 auto' }}>
-            
+
             {/* ============================== */}
             {/* HEADER & NEW CLEAN ROW LAYOUT */}
             {/* ============================== */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '24px' }}>
-                
+
                 {/* Title & Quick Filters */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
                     <h2 className="dashboard-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
@@ -191,42 +202,42 @@ export default function AcceptanceLeaderboard() {
 
                 {/* Dropdowns & Date Picker */}
                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end' }}>
-                    <CustomSelect 
-                        icon={TagIcon} 
-                        value={activeTag} 
-                        onChange={setActiveTag} 
-                        options={[{ value: 'ALL', label: 'All Tags' }, ...tags.map(t => ({ value: t, label: t }))]} 
-                        containerStyle={{ width: '180px', height: '40px' }} 
+                    <CustomSelect
+                        icon={TagIcon}
+                        value={activeTag}
+                        onChange={setActiveTag}
+                        options={[{ value: 'ALL', label: 'All Tags' }, ...tags.map(t => ({ value: t, label: t }))]}
+                        containerStyle={{ width: '180px', height: '40px' }}
                     />
-                    
-                    <CustomSelect 
-                        icon={Clock} 
-                        value={activeShift} 
-                        onChange={setActiveShift} 
-                        options={[{ value: 'ALL', label: 'All Shifts' }, ...shifts.map(s => ({ value: s, label: s }))]} 
-                        containerStyle={{ width: '220px', height: '40px' }} 
+
+                    <CustomSelect
+                        icon={Clock}
+                        value={activeShift}
+                        onChange={setActiveShift}
+                        options={[{ value: 'ALL', label: 'All Shifts' }, ...shifts.map(s => ({ value: s, label: s }))]}
+                        containerStyle={{ width: '220px', height: '40px' }}
                     />
-                    
-                    <CustomSelect 
-                        icon={Users} 
-                        value={teamCategory} 
-                        onChange={setTeamCategory} 
-                        options={[{ value: 'ALL', label: 'All Teams' }, ...teams.map(t => ({ value: t, label: t }))]} 
-                        containerStyle={{ width: '180px', height: '40px' }} 
+
+                    <CustomSelect
+                        icon={Users}
+                        value={teamCategory}
+                        onChange={setTeamCategory}
+                        options={[{ value: 'ALL', label: 'All Teams' }, ...teams.map(t => ({ value: t, label: t }))]}
+                        containerStyle={{ width: '180px', height: '40px' }}
                     />
 
                     <div className="qc-filter-wrapper" style={{ height: '40px' }}>
                         <Calendar size={16} color="var(--text-muted)" />
-                        <input 
-                            type="date" 
-                            value={startDate} 
+                        <input
+                            type="date"
+                            value={startDate}
                             onChange={(e) => handleManualDateChange(setStartDate, e.target.value)}
                             style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none' }}
                         />
                         <span style={{ color: 'var(--text-muted)' }}>to</span>
-                        <input 
-                            type="date" 
-                            value={endDate} 
+                        <input
+                            type="date"
+                            value={endDate}
                             onChange={(e) => handleManualDateChange(setEndDate, e.target.value)}
                             style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none' }}
                         />
@@ -292,7 +303,7 @@ export default function AcceptanceLeaderboard() {
                                         <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-main)' }}>
                                             {row.producer}
                                         </td>
-                                        
+
                                         {/* --- NEW DETAILS COLUMN --- */}
                                         <td style={{ padding: '12px 16px' }}>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>

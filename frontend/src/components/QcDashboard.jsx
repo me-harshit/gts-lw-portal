@@ -91,16 +91,36 @@ export default function QcDashboard() {
     const [expandedTops, setExpandedTops] = useState(new Set());
     const [expandedTasks, setExpandedTasks] = useState(new Set());
 
+    const getBeijingDateStr = (dateObj) => {
+        return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(dateObj);
+    };
+
     const applyQuickFilter = (type) => {
         setActiveFilter(type);
         const today = new Date();
-        const formatDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
-        if (type === 'today') { setStartDate(formatDate(today)); setEndDate(formatDate(today)); } 
-        else if (type === 'yesterday') { const y = new Date(today); y.setDate(y.getDate() - 1); setStartDate(formatDate(y)); setEndDate(formatDate(y)); } 
-        else if (type === 'thisWeek') { const m = new Date(today); m.setDate(m.getDate() - (m.getDay() || 7) + 1); setStartDate(formatDate(m)); setEndDate(formatDate(today)); } 
-        else if (type === 'thisMonth') { setStartDate(formatDate(new Date(today.getFullYear(), today.getMonth(), 1))); setEndDate(formatDate(today)); } 
-        else { setStartDate(''); setEndDate(''); }
+        if (type === 'today') {
+            const todayStr = getBeijingDateStr(today);
+            setStartDate(todayStr); setEndDate(todayStr);
+        } else if (type === 'yesterday') {
+            const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+            const yestStr = getBeijingDateStr(yesterday);
+            setStartDate(yestStr); setEndDate(yestStr);
+        } else if (type === 'thisWeek') {
+            const monday = new Date(today); 
+            const day = monday.getDay() || 7; 
+            monday.setDate(monday.getDate() - (day - 1));
+            setStartDate(getBeijingDateStr(monday)); 
+            setEndDate(getBeijingDateStr(today));
+        } else if (type === 'thisMonth') {
+            const beijingParts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit' }).formatToParts(today);
+            const y = beijingParts.find(p => p.type === 'year').value;
+            const m = beijingParts.find(p => p.type === 'month').value;
+            setStartDate(`${y}-${m}-01`); 
+            setEndDate(getBeijingDateStr(today));
+        } else if (type === 'allTime') {
+            setStartDate(''); setEndDate('');
+        }
     };
 
     const handleDateChange = (setter, value) => { setActiveFilter(''); setter(value); };

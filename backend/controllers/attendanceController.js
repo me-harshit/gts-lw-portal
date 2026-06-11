@@ -5,128 +5,102 @@ export const getAttendance = async (req, res) => {
     try {
         const { startDate, endDate, page = 1, limit = 50, teams, producer } = req.query;
 
-        // Base match constraint
         let initialMatch = {
             start_produce_time: { $exists: true, $ne: null }
         };
 
         let producerCondition = { $ne: "" };
 
-        // --- NEW: SMART TEAM-TO-USER FILTERING ---
         if (teams && teams !== 'ALL') {
             if (teams === '___NONE___') {
-                // If filters were applied but resulted in 0 valid teams, force empty results
                 producerCondition.$in = [];
             } else {
                 const teamArray = teams.split(',');
-                
-                // Find all users assigned to the requested teams
                 const mappings = await TeamMap.find({ teamName: { $in: teamArray } }).lean();
-                const allowedProducers = mappings.map(m => m.username);
-                
-                producerCondition.$in = allowedProducers;
+                producerCondition.$in = mappings.map(m => m.username);
             }
         }
 
-        // --- SEARCH BAR FILTERING ---
         if (producer) {
             producerCondition.$regex = new RegExp(producer, 'i');
         }
 
-        // Apply combined producer conditions
         initialMatch.producer = producerCondition;
+
+        // STRICT IST TIME FILTERING (+05:30)
+        if (startDate || endDate) {
+            initialMatch.start_produce_time = {};
+            if (startDate) initialMatch.start_produce_time.$gte = new Date(`${startDate}T00:00:00.000+05:30`);
+            if (endDate) initialMatch.start_produce_time.$lte = new Date(`${endDate}T23:59:59.999+05:30`);
+        }
 
         const pipeline = [
             { $match: initialMatch },
-
-            // TIMEZONE MATH
             {
                 $addFields: {
-                    actual_ist_time: { $subtract: ["$start_produce_time", 2.5 * 60 * 60 * 1000] },
-                    logical_day_time: {
-                        $subtract: [
-                            { $subtract: ["$start_produce_time", 2.5 * 60 * 60 * 1000] },
-                            6 * 60 * 60 * 1000
-                        ]
-                    },
-                    safe_video_duration: {
-                        $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 }
+                    safe_video_duration: { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } },
+                    working_date: { $dateToString: { format: "%Y-%m-%d", date: "$start_produce_time", timezone: "+05:30" } }
+                }
+            },
+            // --- GROUP 1: By Producer and Date ---
+            {
+                $group: {
+                    _id: { producer: "$producer", date: "$working_date" },
+                    checkIn: { $min: "$start_produce_time" },
+                    checkOut: { $max: "$start_produce_time" },
+                    totalVideos: { $sum: 1 },
+                    // CALCULATE BOTH RECORDED AND ACCEPTED
+                    dailyRecordedSec: { $sum: "$safe_video_duration" },
+                    dailyAcceptedSec: {
+                        $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_PASSED"] }, "$safe_video_duration", 0] }
                     }
                 }
             },
             {
                 $addFields: {
-                    working_date: {
-                        $dateToString: { format: "%Y-%m-%d", date: "$logical_day_time" }
+                    officeDurationSec: {
+                        $divide: [{ $subtract: ["$checkOut", "$checkIn"] }, 1000]
                     }
                 }
-            }
+            },
+            // --- GROUP 2: Rollup by Producer ---
+            {
+                $group: {
+                    _id: "$_id.producer",
+                    presentDays: { $sum: 1 },
+                    totalVideos: { $sum: "$totalVideos" },
+                    totalOfficeDurationSec: { $sum: "$officeDurationSec" },
+                    totalRecordedSec: { $sum: "$dailyRecordedSec" },
+                    totalAcceptedSec: { $sum: "$dailyAcceptedSec" },
+                    dailyRecords: {
+                        $push: {
+                            date: "$_id.date",
+                            checkIn: "$checkIn",
+                            checkOut: "$checkOut",
+                            totalVideos: "$totalVideos",
+                            officeDurationSec: "$officeDurationSec",
+                            recordedSec: "$dailyRecordedSec",
+                            acceptedSec: "$dailyAcceptedSec"
+                        }
+                    }
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    producer: "$_id",
+                    presentDays: 1,
+                    totalVideos: 1,
+                    totalOfficeDurationSec: 1,
+                    totalRecordedSec: 1,
+                    totalAcceptedSec: 1,
+                    dailyRecords: {
+                        $sortArray: { input: "$dailyRecords", sortBy: { date: -1 } }
+                    }
+                }
+            },
+            { $sort: { presentDays: -1, producer: 1 } }
         ];
-
-        if (startDate && endDate) {
-            pipeline.push({
-                $match: {
-                    working_date: { $gte: startDate, $lte: endDate }
-                }
-            });
-        }
-
-        // --- GROUP 1: By Producer and Date ---
-        pipeline.push({
-            $group: {
-                _id: { producer: "$producer", date: "$working_date" },
-                checkIn: { $min: "$actual_ist_time" },
-                checkOut: { $max: "$actual_ist_time" },
-                totalVideos: { $sum: 1 },
-                dailyRecordedSec: { $sum: "$safe_video_duration" } 
-            }
-        });
-
-        pipeline.push({
-            $addFields: {
-                officeDurationSec: {
-                    $divide: [{ $subtract: ["$checkOut", "$checkIn"] }, 1000]
-                }
-            }
-        });
-
-        // --- GROUP 2: Rollup by Producer ---
-        pipeline.push({
-            $group: {
-                _id: "$_id.producer",
-                presentDays: { $sum: 1 },
-                totalVideos: { $sum: "$totalVideos" },
-                totalOfficeDurationSec: { $sum: "$officeDurationSec" },
-                totalRecordedSec: { $sum: "$dailyRecordedSec" }, 
-                dailyRecords: {
-                    $push: {
-                        date: "$_id.date",
-                        checkIn: "$checkIn",
-                        checkOut: "$checkOut",
-                        totalVideos: "$totalVideos",
-                        officeDurationSec: "$officeDurationSec",
-                        recordedSec: "$dailyRecordedSec" 
-                    }
-                }
-            }
-        });
-
-        pipeline.push({
-            $project: {
-                _id: 0,
-                producer: "$_id",
-                presentDays: 1,
-                totalVideos: 1,
-                totalOfficeDurationSec: 1,
-                totalRecordedSec: 1,
-                dailyRecords: {
-                    $sortArray: { input: "$dailyRecords", sortBy: { date: -1 } }
-                }
-            }
-        });
-
-        // Sort by Highest Attendance First, then alphabetically
-        pipeline.push({ $sort: { presentDays: -1, producer: 1 } });
 
         const skip = (Number(page) - 1) * Number(limit);
         const facetPipeline = [

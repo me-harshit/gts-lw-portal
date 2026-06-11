@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { Calendar, ChevronLeft, ChevronRight, Search, UserCheck, AlertCircle, X, ChevronDown, Users, Download, Video, Clock, Tag as TagIcon, Eye, Loader2 } from 'lucide-react';
-import { generateAttendancePDF } from '../utils/pdfExport'; 
-import './ProjectDashboard.css'; 
+import { generateAttendancePDF } from '../utils/pdfExport';
+import './ProjectDashboard.css';
 import './AttendanceDashboard.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -36,8 +36,8 @@ const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder, conta
                 <div className="custom-dropdown-menu">
                     <ul className="custom-dropdown-list">
                         {options.map(opt => (
-                            <li 
-                                key={opt.value} 
+                            <li
+                                key={opt.value}
                                 className={`custom-dropdown-item ${value === opt.value ? 'active' : ''}`}
                                 onClick={() => { onChange(opt.value); setIsOpen(false); }}
                             >
@@ -68,7 +68,7 @@ export default function AttendanceDashboard() {
     const [attendance, setAttendance] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isExporting, setIsExporting] = useState(false);
-    
+
     // Metadata State
     const [teams, setTeams] = useState([]);
     const [teamConfigs, setTeamConfigs] = useState([]);
@@ -107,7 +107,7 @@ export default function AttendanceDashboard() {
                 axios.get(`${API_URL}/api/teams/configs`),
                 axios.get(`${API_URL}/api/teams/tags`),
                 axios.get(`${API_URL}/api/teams/shifts`),
-                axios.get(`${API_URL}/api/teams`) 
+                axios.get(`${API_URL}/api/teams`)
             ]);
             setTeamConfigs(configsRes.data);
             setTags(tagsRes.data.map(t => t.name));
@@ -118,7 +118,7 @@ export default function AttendanceDashboard() {
     };
 
     useEffect(() => {
-        if (!startDate || !endDate) return; 
+        if (!startDate || !endDate) return;
         const fetchAttendance = async () => {
             setIsLoading(true);
             try {
@@ -129,7 +129,7 @@ export default function AttendanceDashboard() {
 
                 let teamQuery = 'ALL';
                 if ((activeTag !== 'ALL' || activeShift !== 'ALL' || teamCategory !== 'ALL') && matchingTeams.length === 0) {
-                    teamQuery = '___NONE___'; 
+                    teamQuery = '___NONE___';
                 } else if (activeTag !== 'ALL' || activeShift !== 'ALL' || teamCategory !== 'ALL') {
                     teamQuery = matchingTeams.map(t => t.name).join(',');
                 }
@@ -141,7 +141,7 @@ export default function AttendanceDashboard() {
                 setAttendance(res.data.attendance);
                 setTotalPages(res.data.totalPages);
                 setTotalRecords(res.data.totalRecords);
-            } catch (err) { console.error("Failed to fetch attendance:", err); } 
+            } catch (err) { console.error("Failed to fetch attendance:", err); }
             finally { setIsLoading(false); }
         };
         const timeoutId = setTimeout(() => fetchAttendance(), 300);
@@ -172,7 +172,7 @@ export default function AttendanceDashboard() {
         let count = 0;
         let current = new Date(start);
         while (current <= end) {
-            count++; 
+            count++;
             current.setDate(current.getDate() + 1);
         }
         return count;
@@ -197,13 +197,13 @@ export default function AttendanceDashboard() {
             if (res.data.attendance.length > 0) {
                 await generateAttendancePDF(res.data.attendance, startDate, endDate, expectedWorkingDays, teamCategory);
             }
-        } catch (error) { console.error("Export failed:", error); } 
+        } catch (error) { console.error("Export failed:", error); }
         finally { setIsExporting(false); }
     };
 
     const formatTimeIST = (dateString) => {
         if (!dateString) return 'N/A';
-        return new Date(dateString).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+        return new Date(dateString).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true });
     };
 
     const formatOfficeHours = (seconds) => {
@@ -215,20 +215,20 @@ export default function AttendanceDashboard() {
 
     const renderCalendar = () => {
         if (!startDate) return null;
-        
+
         const start = new Date(startDate);
         const y = start.getFullYear();
         const m = start.getMonth();
-        
+
         const firstDayOfMonth = new Date(y, m, 1);
         const lastDayOfMonth = new Date(y, m + 1, 0);
-        
+
         const days = [];
-        
+
         for (let i = 0; i < firstDayOfMonth.getDay(); i++) {
             days.push(null);
         }
-        
+
         for (let i = 1; i <= lastDayOfMonth.getDate(); i++) {
             days.push(new Date(y, m, i));
         }
@@ -241,14 +241,14 @@ export default function AttendanceDashboard() {
                 <div className="calendar-days-grid">
                     {days.map((d, index) => {
                         if (!d) return <div key={`empty-${index}`} className="calendar-cell empty"></div>;
-                        
+
                         const dateStr = formatDateString(d);
                         const record = selectedProducer?.dailyRecords.find(r => r.date === dateStr);
                         const isSelected = selectedDateObj?.date === dateStr;
 
                         return (
-                            <div 
-                                key={dateStr} 
+                            <div
+                                key={dateStr}
                                 className={`calendar-cell ${record ? 'present' : 'absent'} ${isSelected ? 'selected' : ''}`}
                                 onClick={() => setSelectedDateObj(record || { date: dateStr, absent: true })}
                             >
@@ -263,7 +263,7 @@ export default function AttendanceDashboard() {
 
     return (
         <div className="dashboard-card" style={{ maxWidth: '1400px', margin: '0 auto' }}>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '24px' }}>
                 <h2 className="dashboard-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'var(--primary)' }}>
                     <UserCheck size={28} /> Detailed Roster
@@ -272,9 +272,9 @@ export default function AttendanceDashboard() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
                     <div className="quick-filters-container">
                         {monthFilters.map(month => (
-                            <button 
+                            <button
                                 key={month.value.getTime()}
-                                className={`quick-filter-btn ${activeMonthFilter === month.value.getTime().toString() ? 'active' : ''}`} 
+                                className={`quick-filter-btn ${activeMonthFilter === month.value.getTime().toString() ? 'active' : ''}`}
                                 onClick={() => applyMonthFilter(month.value)}
                             >
                                 {month.label}
@@ -316,7 +316,7 @@ export default function AttendanceDashboard() {
                             <th className="att-th">Team Details</th>
                             <th className="att-th" style={{ textAlign: 'center' }}>Present Days</th>
                             <th className="att-th" style={{ textAlign: 'center' }}>Total Videos</th>
-                            <th className="att-th" style={{ textAlign: 'center' }}>Recorded Hours</th>
+                            <th className="att-th" style={{ textAlign: 'center' }}>Accepted Hours</th>
                             <th className="att-th" style={{ textAlign: 'center' }}>Office Hours</th>
                             <th className="att-th" style={{ textAlign: 'center' }}>Action</th>
                         </tr>
@@ -337,8 +337,7 @@ export default function AttendanceDashboard() {
                                         <td style={{ padding: '16px', color: 'var(--text-main)', fontWeight: '600' }}>
                                             {record.producer}
                                         </td>
-                                        
-                                        {/* --- NEW DETAILS COLUMN --- */}
+
                                         <td style={{ padding: '12px 16px' }}>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                                 <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-main)' }}>{teamName}</span>
@@ -359,7 +358,7 @@ export default function AttendanceDashboard() {
 
                                         <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: '#10b981' }}>{record.presentDays}</td>
                                         <td style={{ padding: '16px', textAlign: 'center', fontWeight: '600' }}>{record.totalVideos}</td>
-                                        <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: 'var(--primary)' }}>{formatOfficeHours(record.totalRecordedSec)}</td>
+                                        <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: 'var(--primary)' }}>{formatOfficeHours(record.totalAcceptedSec)}</td>
                                         <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: 'var(--text-main)' }}>{formatOfficeHours(record.totalOfficeDurationSec)}</td>
                                         <td style={{ padding: '16px', textAlign: 'center' }}>
                                             <button className="view-details-btn" onClick={() => { setSelectedProducer(record); setSelectedDateObj(null); }}>
@@ -394,7 +393,7 @@ export default function AttendanceDashboard() {
                     </div>
                     <button onClick={() => { setSelectedProducer(null); setSelectedDateObj(null); }} className="overlay-close-btn"><X size={20} /></button>
                 </div>
-                
+
                 <div className="overlay-content">
                     {renderCalendar()}
 
@@ -405,24 +404,29 @@ export default function AttendanceDashboard() {
                                 {new Date(selectedDateObj.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                                 {selectedDateObj.absent && <span style={{ background: '#fef2f2', color: '#ef4444', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', marginLeft: 'auto' }}>Absent</span>}
                             </div>
-                            
+
                             {!selectedDateObj.absent && (
                                 <div className="daily-stats-grid" style={{ gridTemplateColumns: '1fr 1fr', rowGap: '16px', columnGap: '12px' }}>
                                     <div>
-                                        <div className="daily-label">First Video Recorded</div>
+                                        <div className="daily-label">First Video</div>
                                         <div style={{ fontWeight: 'bold', color: '#10b981', fontSize: '14px' }}>{formatTimeIST(selectedDateObj.checkIn)}</div>
                                     </div>
                                     <div>
-                                        <div className="daily-label">Last Video Recorded</div>
+                                        <div className="daily-label">Last Video</div>
                                         <div style={{ fontWeight: 'bold', color: selectedDateObj.totalVideos === 1 ? 'var(--text-muted)' : '#f59e0b', fontSize: '14px' }}>
                                             {selectedDateObj.totalVideos === 1 ? 'N/A' : formatTimeIST(selectedDateObj.checkOut)}
                                         </div>
                                     </div>
-                                    
+
                                     <div>
-                                        <div className="daily-label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Video size={12}/> Recorded</div>
-                                        <div style={{ fontWeight: 'bold', color: 'var(--primary)', fontSize: '14px' }}>{formatOfficeHours(selectedDateObj.recordedSec)}</div>
+                                        <div className="daily-label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Video size={12} /> Recorded</div>
+                                        <div style={{ fontWeight: 'bold', color: 'var(--text-main)', fontSize: '14px' }}>{formatOfficeHours(selectedDateObj.recordedSec)}</div>
                                     </div>
+                                    <div>
+                                        <div className="daily-label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Video size={12} /> Accepted</div>
+                                        <div style={{ fontWeight: 'bold', color: 'var(--primary)', fontSize: '14px' }}>{formatOfficeHours(selectedDateObj.acceptedSec)}</div>
+                                    </div>
+
                                     <div>
                                         <div className="daily-label">Office Time</div>
                                         <div style={{ fontWeight: 'bold', color: 'var(--text-main)', fontSize: '14px' }}>{selectedDateObj.totalVideos === 1 ? '0h 0m' : formatOfficeHours(selectedDateObj.officeDurationSec)}</div>
@@ -431,7 +435,7 @@ export default function AttendanceDashboard() {
                                     <div style={{ gridColumn: '1 / -1', background: 'var(--bg-main)', padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <span className="daily-label" style={{ margin: 0 }}>Total Videos Submissions:</span>
                                         <span style={{ fontWeight: 'bold' }}>
-                                            {selectedDateObj.totalVideos === 1 ? <span style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '4px' }}><AlertCircle size={12}/> 1</span> : selectedDateObj.totalVideos}
+                                            {selectedDateObj.totalVideos === 1 ? <span style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '4px' }}><AlertCircle size={12} /> 1</span> : selectedDateObj.totalVideos}
                                         </span>
                                     </div>
                                 </div>
@@ -440,7 +444,7 @@ export default function AttendanceDashboard() {
                     )}
                 </div>
             </div>
-            
+
             {selectedProducer && <div className="overlay-backdrop" onClick={() => { setSelectedProducer(null); setSelectedDateObj(null); }}></div>}
 
         </div>
