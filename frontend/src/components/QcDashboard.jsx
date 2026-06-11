@@ -58,7 +58,7 @@ export default function QcDashboard() {
     // Filters
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
-    const [activeFilter, setActiveFilter] = useState('allTime');
+    const [activeFilter, setActiveFilter] = useState('thisMonth');
     
     const [activeTag, setActiveTag] = useState('ALL');
     const [activeShift, setActiveShift] = useState('ALL');

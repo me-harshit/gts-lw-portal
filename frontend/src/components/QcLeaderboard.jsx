@@ -55,7 +55,7 @@ const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder, conta
 export default function QcLeaderboard() {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
-    const [activeFilterBtn, setActiveFilterBtn] = useState('');
+    const [activeFilterBtn, setActiveFilterBtn] = useState('thisMonth');
     const [searchQuery, setSearchQuery] = useState('');
     
     // Metadata Filters

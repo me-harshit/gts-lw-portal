@@ -49,7 +49,7 @@ export default function ProjectDashboard() {
     const [viewCategory, setViewCategory] = useState('ALL');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
-    const [activeGlobalFilter, setActiveGlobalFilter] = useState('allTime');
+    const [activeGlobalFilter, setActiveGlobalFilter] = useState('thisMonth');
 
     const [activeTag, setActiveTag] = useState('ALL');
     const [activeShift, setActiveShift] = useState('ALL');

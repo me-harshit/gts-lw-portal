@@ -57,7 +57,7 @@ export default function AcceptanceLeaderboard() {
     // Filter State
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
-    const [activeFilterBtn, setActiveFilterBtn] = useState('');
+    const [activeFilterBtn, setActiveFilterBtn] = useState('thisMonth');
     
     // Metadata Filters
     const [activeTag, setActiveTag] = useState('ALL');
