@@ -173,7 +173,7 @@ export const triggerDashboardSync = async (req, res) => {
 
                 const formatLightwheelDate = (dateStr) => {
                     if (!dateStr) return null;
-                    return new Date(dateStr.trim().replace(' ', 'T') + 'Z');
+                    return new Date(dateStr.trim().replace(' ', 'T') + '+08:00');
                 };
 
                 // --- HELPER TO PROCESS BATCHES WITH ANOMALY DETECTION ---

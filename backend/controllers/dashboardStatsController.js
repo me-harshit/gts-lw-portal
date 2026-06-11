@@ -4,22 +4,10 @@ import TeamMap from '../models/TeamMap.js';
 export const getDashboardSummary = async (req, res) => {
     try {
         const { category, teams, startDate, endDate } = req.query;
-
-        // Helper: convert a YYYY-MM-DD string to the UTC range for that full Beijing day
-        const getBeijingDayRange = (dateStr) => {
-            const beijingDate = new Date(`${dateStr}T00:00:00+08:00`);
-            const startUTC = new Date(beijingDate.toISOString());
-            const endUTC = new Date(beijingDate);
-            endUTC.setDate(endUTC.getDate() + 1);
-            endUTC.setMilliseconds(-1);
-            return { startUTC, endUTC };
-        };
-
-        // Base match for ALL queries (category + teams)
         let baseMatch = { start_produce_time: { $exists: true, $ne: null } };
-        if (category && category !== 'ALL') {
-            baseMatch.project_category = new RegExp(category, 'i');
-        }
+
+        if (category && category !== 'ALL') baseMatch.project_category = new RegExp(category, 'i');
+
         if (teams && teams !== 'ALL') {
             if (teams === '___NONE___') {
                 baseMatch.producer = { $in: [] };
@@ -30,19 +18,26 @@ export const getDashboardSummary = async (req, res) => {
             }
         }
 
-        // --- 1. Summary query (respects date range, if provided) ---
-        let summaryMatch = { ...baseMatch };
+        // 1. SUMMARY CARDS: Fixed to Last 10 Days in Beijing Time
+        const bjgNow = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Shanghai"}));
+        const bjg10DaysAgo = new Date(bjgNow);
+        bjg10DaysAgo.setDate(bjg10DaysAgo.getDate() - 9);
+        const startOf10DaysStr = `${bjg10DaysAgo.getFullYear()}-${String(bjg10DaysAgo.getMonth() + 1).padStart(2, '0')}-${String(bjg10DaysAgo.getDate()).padStart(2, '0')}T00:00:00.000+08:00`;
+        
+        const statsMatch = { ...baseMatch, start_produce_time: { $gte: new Date(startOf10DaysStr) } };
+
+        // 2. TREND TABLE: Listens to UI Date Filter (Strict Beijing Time)
+        let trendMatch = { ...baseMatch };
         if (startDate && endDate) {
-            const startRange = getBeijingDayRange(startDate);
-            const endRange = getBeijingDayRange(endDate);
-            summaryMatch.start_produce_time = {
-                $gte: startRange.startUTC,
-                $lte: endRange.endUTC
+            trendMatch.start_produce_time = {
+                $gte: new Date(`${startDate}T00:00:00.000+08:00`),
+                $lte: new Date(`${endDate}T23:59:59.999+08:00`)
             };
         }
 
+        // Aggregate Summary Cards
         const statsPromise = AllRecord.aggregate([
-            { $match: summaryMatch },
+            { $match: statsMatch },
             { $addFields: { safe_video_duration: { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } } } },
             {
                 $group: {
@@ -59,28 +54,19 @@ export const getDashboardSummary = async (req, res) => {
             }
         ]);
 
-        // --- 2. Trend query (always last 10 days, no date range filter) ---
-        // Uses Beijing date grouping WITHOUT any startDate/endDate restriction.
-        const trendMatch = { ...baseMatch };  // no date filter added
-
+        // Aggregate Trend Table
         const trendPromise = AllRecord.aggregate([
             { $match: trendMatch },
             {
                 $addFields: {
                     safe_video_duration: { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } },
-                    // Extract date in Asia/Shanghai timezone
-                    beijing_date: {
-                        $dateToString: {
-                            format: "%Y-%m-%d",
-                            date: "$start_produce_time",
-                            timezone: "Asia/Shanghai"
-                        }
-                    }
+                    // CRITICAL: Force MongoDB to group days by Beijing Midnight, not UTC
+                    bjg_date: { $dateToString: { format: "%Y-%m-%d", date: "$start_produce_time", timezone: "+08:00" } }
                 }
             },
             {
                 $group: {
-                    _id: "$beijing_date",
+                    _id: "$bjg_date",
                     uniqueProducers: { $addToSet: "$producer" },
                     totalCount: { $sum: 1 },
                     totalHours: { $sum: "$safe_video_duration" },
@@ -92,8 +78,7 @@ export const getDashboardSummary = async (req, res) => {
                     pendingHours: { $sum: { $cond: [{ $eq: ["$inspect_result", "INSPECT_WAITING"] }, "$safe_video_duration", 0] } }
                 }
             },
-            { $sort: { _id: -1 } },  // latest date first
-            { $limit: 10 }
+            { $sort: { _id: -1 } }
         ]);
 
         const [statsResult, trendResult] = await Promise.all([statsPromise, trendPromise]);
