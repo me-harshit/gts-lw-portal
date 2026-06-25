@@ -358,7 +358,7 @@ export default function AttendanceDashboard() {
 
                                         <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: '#10b981' }}>{record.presentDays}</td>
                                         <td style={{ padding: '16px', textAlign: 'center', fontWeight: '600' }}>{record.totalVideos}</td>
-                                        <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: 'var(--primary)' }}>{formatOfficeHours(record.totalAcceptedSec)}</td>
+                                        <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: '#10b981' }}>{formatOfficeHours(record.totalAcceptedSec)}</td>
                                         <td style={{ padding: '16px', textAlign: 'center', fontWeight: 'bold', color: 'var(--text-main)' }}>{formatOfficeHours(record.totalOfficeDurationSec)}</td>
                                         <td style={{ padding: '16px', textAlign: 'center' }}>
                                             <button className="view-details-btn" onClick={() => { setSelectedProducer(record); setSelectedDateObj(null); }}>

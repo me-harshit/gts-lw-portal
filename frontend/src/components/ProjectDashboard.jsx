@@ -171,7 +171,7 @@ export default function ProjectDashboard() {
                     <CustomSelect className="pd-select-sm" icon={TagIcon} value={activeTag} onChange={setActiveTag} options={[{ value: 'ALL', label: 'All Tags' }, ...tags.map(t => ({ value: t, label: t }))]} />
                     <CustomSelect className="pd-select-md" icon={Clock} value={activeShift} onChange={setActiveShift} options={[{ value: 'ALL', label: 'All Shifts' }, ...shifts.map(s => ({ value: s, label: s }))]} />
                     <CustomSelect className="pd-select-sm" icon={Users} value={teamCategory} onChange={setTeamCategory} options={[{ value: 'ALL', label: 'All Teams' }, ...teams.map(t => ({ value: t, label: t }))]} />
-                    <CustomSelect className="pd-select-sm" icon={Filter} value={viewCategory} onChange={setViewCategory} options={[{ value: 'ALL', label: 'All Projects' }, { value: 'OFFICE', label: 'Office Tasks' }, { value: 'HOUSE', label: 'House Tasks' }]} />
+                    <CustomSelect className="pd-select-sm" icon={Filter} value={viewCategory} onChange={setViewCategory} options={[{ value: 'ALL', label: 'All Projects' }, { value: 'OFFICE', label: 'Office Tasks' }, { value: 'HOUSE', label: 'House Tasks' }, { value: 'GYM', label: 'Gym Tasks' }]} />
 
                     <div className="pd-date-wrapper">
                         <Calendar size={16} className="pd-icon-muted" />

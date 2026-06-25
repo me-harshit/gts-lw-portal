@@ -80,7 +80,11 @@ export default function SyncDataPage() {
         { id: PROJECTS.HOUSE, category: 'HOUSE', name: 'House Tasks' },
         { id: PROJECTS.GYM, category: 'GYM', name: 'Gym Tasks' }
     ]);
-    const handleQcSync = () => startQcSync([{ id: PROJECTS.OFFICE, category: 'OFFICE', name: 'Office Tasks' }, { id: PROJECTS.HOUSE, category: 'HOUSE', name: 'House Tasks' }]);
+    const handleQcSync = () => startQcSync([
+        { id: PROJECTS.OFFICE, category: 'OFFICE', name: 'Office Tasks' },
+        { id: PROJECTS.HOUSE, category: 'HOUSE', name: 'House Tasks' },
+        { id: PROJECTS.GYM, category: 'GYM', name: 'Gym Tasks' }
+    ]);
 
     const translationPercent = translationData.total > 0 ? Math.round((translationData.processed / translationData.total) * 100) : 0;
     const isStopping = translationData.message === "Stopping Engine...";
