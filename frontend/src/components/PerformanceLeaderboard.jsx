@@ -188,7 +188,7 @@ export default function PerformanceLeaderboard() {
             shift: config ? config.timingSlot : 'N/A',
             dailyAverageSec: allTimeMatch ? allTimeMatch.dailyAverageSec : row.dailyAverageSec
         };
-    }).sort((a, b) => b.dailyAverageSec - a.dailyAverageSec);
+    }).sort((a, b) => b.totalSec - a.totalSec);
 
     const totalHoursSec = leaderboard.reduce((acc, curr) => acc + (curr.totalSec || 0), 0);
     const teamAvgSec = leaderboard.length ? leaderboard.reduce((acc, curr) => acc + (curr.dailyAverageSec || 0), 0) / leaderboard.length : 0;
