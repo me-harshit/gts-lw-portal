@@ -1,7 +1,9 @@
 import { useState, Fragment } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
-import { Search, ChevronDown, ChevronRight, Flag, Target, Building2, Home, Dumbbell } from 'lucide-react'; // <-- Added Dumbbell
+import { Search, ChevronDown, ChevronRight, Flag, Target, Building2, Home, Dumbbell, RefreshCw } from 'lucide-react';
+import { useSync } from '../context/SyncContext';
+import { PROJECTS } from '../config/constants';
 import './TaskDashboard.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -32,6 +34,15 @@ export default function TaskDashboard() {
     const [activeFilter, setActiveFilter] = useState('ALL');
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedRows, setExpandedRows] = useState(new Set());
+
+    const { startTaskSync, syncState, syncType } = useSync();
+    const isTaskSyncing = syncState === 'syncing' && syncType === 'TASK';
+
+    const handleTaskSync = () => startTaskSync([
+        { id: PROJECTS.OFFICE, category: 'OFFICE', name: 'Office Tasks' },
+        { id: PROJECTS.HOUSE, category: 'HOUSE', name: 'House Tasks' },
+        { id: PROJECTS.GYM, category: 'GYM', name: 'Gym Tasks' }
+    ]);
 
     const { data: allTasks = [], isLoading, isError } = useQuery({
         queryKey: ['tasks'],
@@ -95,6 +106,21 @@ export default function TaskDashboard() {
         <div className="dashboard-card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                 <h2 className="dashboard-header" style={{ margin: 0 }}>Task Management</h2>
+                <button
+                    onClick={handleTaskSync}
+                    disabled={syncState === 'syncing'}
+                    style={{
+                        display: 'flex', alignItems: 'center', gap: '8px',
+                        padding: '8px 16px', borderRadius: '8px', fontSize: '14px', fontWeight: '600',
+                        border: 'none', cursor: syncState === 'syncing' ? 'not-allowed' : 'pointer',
+                        backgroundColor: syncState === 'syncing' ? 'var(--bg-secondary)' : 'var(--primary)',
+                        color: syncState === 'syncing' ? 'var(--text-muted)' : 'white',
+                        transition: 'all 0.2s'
+                    }}
+                >
+                    <RefreshCw size={15} className={isTaskSyncing ? 'spinning' : ''} />
+                    {isTaskSyncing ? 'Syncing...' : 'Sync Tasks'}
+                </button>
             </div>
 
             {/* --- UNIFIED TABS --- */}
