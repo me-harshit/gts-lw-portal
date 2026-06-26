@@ -27,13 +27,14 @@ export const getDashboardSummary = async (req, res) => {
             };
         }
 
-        // 2. DAILY TREND TABLE: Permanently locked to Last 10 Days in Beijing Time
+        // 2. DAILY TREND TABLE: Window size controlled by trendDays param (default 14, max 62)
+        const trendDays = Math.min(parseInt(req.query.trendDays) || 14, 62);
         const bjgNow = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Shanghai"}));
-        const bjg10DaysAgo = new Date(bjgNow);
-        bjg10DaysAgo.setDate(bjg10DaysAgo.getDate() - 9); 
-        const startOf10DaysStr = `${bjg10DaysAgo.getFullYear()}-${String(bjg10DaysAgo.getMonth() + 1).padStart(2, '0')}-${String(bjg10DaysAgo.getDate()).padStart(2, '0')}T00:00:00.000+08:00`;
-        
-        const trendMatch = { ...baseMatch, start_produce_time: { $gte: new Date(startOf10DaysStr) } };
+        const bjgTrendStart = new Date(bjgNow);
+        bjgTrendStart.setDate(bjgTrendStart.getDate() - (trendDays - 1));
+        const startOfTrendStr = `${bjgTrendStart.getFullYear()}-${String(bjgTrendStart.getMonth() + 1).padStart(2, '0')}-${String(bjgTrendStart.getDate()).padStart(2, '0')}T00:00:00.000+08:00`;
+
+        const trendMatch = { ...baseMatch, start_produce_time: { $gte: new Date(startOfTrendStr) } };
 
         // Aggregate Top Stats Cards
         const statsPromise = AllRecord.aggregate([

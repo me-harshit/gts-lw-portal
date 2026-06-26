@@ -186,12 +186,13 @@ export default function PerformanceLeaderboard() {
             teamName,
             tag: config ? config.tag : 'N/A',
             shift: config ? config.timingSlot : 'N/A',
+            filteredDailyAvgSec: row.dailyAverageSec,
             dailyAverageSec: allTimeMatch ? allTimeMatch.dailyAverageSec : row.dailyAverageSec
         };
     }).sort((a, b) => b.totalSec - a.totalSec);
 
     const totalHoursSec = leaderboard.reduce((acc, curr) => acc + (curr.totalSec || 0), 0);
-    const teamAvgSec = leaderboard.length ? leaderboard.reduce((acc, curr) => acc + (curr.dailyAverageSec || 0), 0) / leaderboard.length : 0;
+    const teamAvgSec = leaderboard.length ? leaderboard.reduce((acc, curr) => acc + (curr.filteredDailyAvgSec || 0), 0) / leaderboard.length : 0;
     const topPerformers = leaderboard.filter(p => p.dailyAverageSec >= 9000).length;
     const lowPerformers = leaderboard.filter(p => p.dailyAverageSec < 6300).length;
 
