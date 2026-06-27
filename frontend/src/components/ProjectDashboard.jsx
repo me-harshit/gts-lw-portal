@@ -45,7 +45,7 @@ const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder, class
     );
 };
 
-function BarLineChart({ data, todayStr }) {
+function BarLineChart({ data, todayStr, splitDate, prevLabel, currLabel }) {
     const [tooltip, setTooltip] = useState(null);
 
     if (!data || data.length === 0) return (
@@ -72,10 +72,21 @@ function BarLineChart({ data, todayStr }) {
     const yCol = v => PT + plotH - (v / collMax) * plotH;
     const yHrs = v => PT + plotH - (v / hrsMax)  * plotH;
 
+    // Split index: first bar of the "current" period
+    const rawSplit = splitDate ? data.findIndex(d => d.date >= splitDate) : -1;
+    const splitIdx = rawSplit === -1 ? data.length : rawSplit;
+
+    // Two line segments sharing the connection point at splitIdx
+    const prevLinePath = splitIdx > 0
+        ? data.slice(0, Math.min(splitIdx + 1, n)).map((d, i) =>
+            `${i === 0 ? 'M' : 'L'}${cx(i).toFixed(1)},${yHrs(d.total?.hours || 0).toFixed(1)}`).join(' ')
+        : null;
+    const currLinePath = splitIdx < n
+        ? data.slice(splitIdx).map((d, i) =>
+            `${i === 0 ? 'M' : 'L'}${cx(splitIdx + i).toFixed(1)},${yHrs(d.total?.hours || 0).toFixed(1)}`).join(' ')
+        : null;
+
     const ticks = Array.from({ length: INTERVALS + 1 }, (_, i) => i);
-    const linePath = data.map((d, i) =>
-        `${i === 0 ? 'M' : 'L'}${cx(i).toFixed(1)},${yHrs(d.total?.hours || 0).toFixed(1)}`
-    ).join(' ');
 
     const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const fmtDate = s => {
@@ -90,6 +101,11 @@ function BarLineChart({ data, todayStr }) {
 
     // Thin out x-axis labels for dense charts
     const labelEvery = n <= 14 ? 1 : n <= 20 ? 2 : 5;
+
+    // Vertical separator x-position (midpoint between last prev bar and first curr bar)
+    const sepX = splitIdx > 0 && splitIdx < n
+        ? (cx(splitIdx - 1) + cx(splitIdx)) / 2
+        : null;
 
     return (
         <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block', overflow: 'visible' }}>
@@ -118,8 +134,23 @@ function BarLineChart({ data, todayStr }) {
                 );
             })}
 
-            {/* Blue bars — Active Collectors */}
+            {/* Vertical period separator */}
+            {sepX && (
+                <g pointerEvents="none">
+                    <line x1={sepX.toFixed(1)} y1={PT} x2={sepX.toFixed(1)} y2={PT + plotH}
+                        stroke="var(--border-color)" strokeWidth="1.5" strokeDasharray="5 3" opacity="0.9" />
+                    <text x={sepX - 8} y={PT + 13} textAnchor="end" fontSize="10" fontWeight="600" fill="var(--text-muted)" opacity="0.7">
+                        {prevLabel || 'PREV'}
+                    </text>
+                    <text x={sepX + 8} y={PT + 13} textAnchor="start" fontSize="10" fontWeight="600" fill="var(--text-muted)" opacity="0.9">
+                        {currLabel || 'CURRENT'}
+                    </text>
+                </g>
+            )}
+
+            {/* Blue bars — Active Collectors (prev=dull, current=vivid) */}
             {data.map((d, i) => {
+                const isPrev = i < splitIdx;
                 const v  = d.activeProducers || 0;
                 const bx = cx(i) - barW / 2;
                 const by = yCol(v);
@@ -127,25 +158,36 @@ function BarLineChart({ data, todayStr }) {
                 return (
                     <rect key={i} x={bx.toFixed(1)} y={by.toFixed(1)}
                         width={barW.toFixed(1)} height={bh.toFixed(1)}
-                        fill="#3b82f6" rx="3" opacity="0.82"
+                        fill="#3b82f6" rx="3" opacity={isPrev ? '0.28' : '0.82'}
                         style={{ cursor: 'pointer' }}
                         onMouseEnter={() => setTooltip({ i, d })}
                         onMouseLeave={() => setTooltip(null)} />
                 );
             })}
 
-            {/* Green line — Hrs Collected */}
-            <path d={linePath} fill="none" stroke="#10b981" strokeWidth="2.5"
-                strokeLinejoin="round" strokeLinecap="round" />
+            {/* Green line — prev period dashed+faint, current period solid */}
+            {prevLinePath && (
+                <path d={prevLinePath} fill="none" stroke="#10b981" strokeWidth="2"
+                    strokeDasharray="5 3" opacity="0.3"
+                    strokeLinejoin="round" strokeLinecap="round" />
+            )}
+            {currLinePath && (
+                <path d={currLinePath} fill="none" stroke="#10b981" strokeWidth="2.5"
+                    strokeLinejoin="round" strokeLinecap="round" />
+            )}
 
-            {/* Dots on line */}
-            {data.map((d, i) => (
-                <circle key={i} cx={cx(i).toFixed(1)} cy={yHrs(d.total?.hours || 0).toFixed(1)}
-                    r="5" fill="#10b981" stroke="var(--bg-sidebar)" strokeWidth="2.5"
-                    style={{ cursor: 'pointer' }}
-                    onMouseEnter={() => setTooltip({ i, d })}
-                    onMouseLeave={() => setTooltip(null)} />
-            ))}
+            {/* Dots on line (prev=faint, current=vivid) */}
+            {data.map((d, i) => {
+                const isPrev = i < splitIdx;
+                return (
+                    <circle key={i} cx={cx(i).toFixed(1)} cy={yHrs(d.total?.hours || 0).toFixed(1)}
+                        r="5" fill="#10b981" stroke="var(--bg-sidebar)" strokeWidth="2.5"
+                        opacity={isPrev ? '0.3' : '1'}
+                        style={{ cursor: 'pointer' }}
+                        onMouseEnter={() => setTooltip({ i, d })}
+                        onMouseLeave={() => setTooltip(null)} />
+                );
+            })}
 
             {/* X-axis date labels */}
             {data.map((d, i) => {
@@ -347,6 +389,7 @@ export default function ProjectDashboard() {
         month:    { current: 'This Month',   prev: 'Last Month'    }
     };
     const pLabel = periodLabels[chartFilter] || periodLabels.week;
+    const splitDate = chartFilter === '10days' ? tenStartStr : chartFilter === 'month' ? thisMonStartStr : thisMondayStr;
 
     const totalCount = summary?.total?.count || 0;
     const acceptedCount = summary?.accepted?.count || 0;
@@ -443,76 +486,6 @@ export default function ProjectDashboard() {
 
             <hr className="pd-divider" />
 
-            <div className="pd-section-header">
-                <h3 className="pd-section-title">
-                    <TrendingUp size={20} className="pd-icon-primary" />
-                    Daily Production Summary
-                </h3>
-            </div>
-
-            <div className={`pd-table-wrapper ${isFetching ? 'pd-is-fetching' : ''}`}>
-                <table className="pd-table">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th className="pd-text-center">Active Collectors</th>
-                            <th className="pd-text-center">Hrs Collected</th>
-                            <th className="pd-text-center pd-th-success">QC Pass</th>
-                            <th className="pd-text-center pd-th-danger">QC Fail</th>
-                            <th className="pd-text-center pd-th-warning">QC Pending</th>
-                            <th className="pd-text-center pd-th-main">Pass Rate</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {summary?.trend?.length > 0 ? (
-                            summary.trend.map(day => {
-                                const passRate = day.accepted.hours > 0
-                                    ? ((day.accepted.hours / (day.accepted.hours + day.rejected.hours)) * 100).toFixed(1)
-                                    : '0.0';
-
-                                return (
-                                    <tr key={day.date}>
-                                        <td>
-                                            <div className="pd-table-val">{day.date}</div>
-                                        </td>
-                                        <td className="pd-text-center">
-                                            <div className="pd-table-val">{day.activeProducers}</div>
-                                        </td>
-                                        <td className="pd-text-center">
-                                            <div className="pd-table-val">{formatDecimalHours(day.total.hours)}</div>
-                                            <div className="pd-table-subtext">{day.total.count.toLocaleString()} clips</div>
-                                        </td>
-                                        <td className="pd-text-center">
-                                            <div className="pd-table-val-success">{formatDecimalHours(day.accepted.hours)}</div>
-                                            <div className="pd-table-subtext">{day.accepted.count.toLocaleString()} clips</div>
-                                        </td>
-                                        <td className="pd-text-center">
-                                            <div className="pd-table-val-danger">{formatDecimalHours(day.rejected.hours)}</div>
-                                            <div className="pd-table-subtext">{day.rejected.count.toLocaleString()} clips</div>
-                                        </td>
-                                        <td className="pd-text-center">
-                                            <div className="pd-table-val-warning">{formatDecimalHours(day.pending.hours)}</div>
-                                            <div className="pd-table-subtext">{day.pending.count.toLocaleString()} clips</div>
-                                        </td>
-                                        <td className="pd-text-center">
-                                            <div className="pd-table-val-primary">{passRate}%</div>
-                                        </td>
-                                    </tr>
-                                );
-                            })
-                        ) : (
-                            <tr>
-                                <td colSpan="7" className="pd-empty-state">
-                                    {isFetching ? <Loader2 className="spinning pd-icon-center" size={24} /> : 'No data found for the selected filters.'}
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
-
-            <hr className="pd-divider" />
-
             {/* ====== ACTIVE COLLECTORS VS PRODUCTION HOURS ====== */}
             <div className="pd-section-header" style={{ flexWrap: 'wrap', gap: '12px' }}>
                 <h3 className="pd-section-title" style={{ textTransform: 'uppercase', fontSize: '13px', letterSpacing: '1px', fontWeight: '700' }}>
@@ -596,7 +569,77 @@ export default function ProjectDashboard() {
 
             {/* Chart */}
             <div style={{ background: 'var(--bg-secondary)', borderRadius: '12px', padding: '20px 20px 12px', border: '1px solid var(--border-color)' }}>
-                <BarLineChart data={chartData} todayStr={todayStr} />
+                <BarLineChart data={chartData} todayStr={todayStr} splitDate={splitDate} prevLabel={pLabel.prev} currLabel={pLabel.current} />
+            </div>
+
+            <hr className="pd-divider" />
+
+            <div className="pd-section-header">
+                <h3 className="pd-section-title">
+                    <TrendingUp size={20} className="pd-icon-primary" />
+                    Daily Production Summary
+                </h3>
+            </div>
+
+            <div className={`pd-table-wrapper ${isFetching ? 'pd-is-fetching' : ''}`}>
+                <table className="pd-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th className="pd-text-center">Active Collectors</th>
+                            <th className="pd-text-center">Hrs Collected</th>
+                            <th className="pd-text-center pd-th-success">QC Pass</th>
+                            <th className="pd-text-center pd-th-danger">QC Fail</th>
+                            <th className="pd-text-center pd-th-warning">QC Pending</th>
+                            <th className="pd-text-center pd-th-main">Pass Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {summary?.trend?.length > 0 ? (
+                            summary.trend.map(day => {
+                                const passRate = day.accepted.hours > 0
+                                    ? ((day.accepted.hours / (day.accepted.hours + day.rejected.hours)) * 100).toFixed(1)
+                                    : '0.0';
+
+                                return (
+                                    <tr key={day.date}>
+                                        <td>
+                                            <div className="pd-table-val">{day.date}</div>
+                                        </td>
+                                        <td className="pd-text-center">
+                                            <div className="pd-table-val">{day.activeProducers}</div>
+                                        </td>
+                                        <td className="pd-text-center">
+                                            <div className="pd-table-val">{formatDecimalHours(day.total.hours)}</div>
+                                            <div className="pd-table-subtext">{day.total.count.toLocaleString()} clips</div>
+                                        </td>
+                                        <td className="pd-text-center">
+                                            <div className="pd-table-val-success">{formatDecimalHours(day.accepted.hours)}</div>
+                                            <div className="pd-table-subtext">{day.accepted.count.toLocaleString()} clips</div>
+                                        </td>
+                                        <td className="pd-text-center">
+                                            <div className="pd-table-val-danger">{formatDecimalHours(day.rejected.hours)}</div>
+                                            <div className="pd-table-subtext">{day.rejected.count.toLocaleString()} clips</div>
+                                        </td>
+                                        <td className="pd-text-center">
+                                            <div className="pd-table-val-warning">{formatDecimalHours(day.pending.hours)}</div>
+                                            <div className="pd-table-subtext">{day.pending.count.toLocaleString()} clips</div>
+                                        </td>
+                                        <td className="pd-text-center">
+                                            <div className="pd-table-val-primary">{passRate}%</div>
+                                        </td>
+                                    </tr>
+                                );
+                            })
+                        ) : (
+                            <tr>
+                                <td colSpan="7" className="pd-empty-state">
+                                    {isFetching ? <Loader2 className="spinning pd-icon-center" size={24} /> : 'No data found for the selected filters.'}
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
             </div>
 
         </div>
