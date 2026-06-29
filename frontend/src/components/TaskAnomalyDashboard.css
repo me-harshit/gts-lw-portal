@@ -165,6 +165,5 @@
 }
 
 .ta-goal-text--old {
-  text-decoration: line-through;
-  opacity: 0.7;
+  opacity: 0.5;
 }
