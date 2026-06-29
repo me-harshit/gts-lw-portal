@@ -15,6 +15,7 @@ import { SyncProvider } from './context/SyncContext';
 // PROJECTS
 // =========================
 import TaskDashboard from './components/TaskDashboard';
+import TaskAnomalyDashboard from './components/TaskAnomalyDashboard';
 
 // =========================
 // REPORTS
@@ -86,6 +87,7 @@ export default function App() {
 
                         {/* PROJECTS */}
                         <Route path="/tasks" element={<TaskDashboard />} />
+                        <Route path="/task-anomaly" element={<TaskAnomalyDashboard />} />
 
                         {/* REPORTS (Access: Everyone) */}
                         <Route path="/dashboard" element={<ProjectDashboard />} />

@@ -1,0 +1,170 @@
+/* ====================================================
+   TASK ANOMALY DASHBOARD — overrides on top of TaskDashboard.css
+   ==================================================== */
+
+/* Header icon with amber background */
+.ta-header-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background-color: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  flex-shrink: 0;
+}
+
+/* Stat cards — amber left border when inactive, full amber when active tab matches */
+.ta-stat-card {
+  border-left: 3px solid transparent;
+  transition: border-color 0.2s ease, all 0.3s ease;
+}
+
+.ta-stat-card:hover {
+  border-color: #f59e0b;
+}
+
+.ta-stat-card--active {
+  border-color: #f59e0b !important;
+  background-color: rgba(245, 158, 11, 0.06) !important;
+}
+
+.ta-stat-card--active .card-title {
+  color: #f59e0b !important;
+}
+
+.ta-stat-card--active .card-value {
+  color: #f59e0b;
+}
+
+/* Count badge on tab buttons */
+.ta-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  background-color: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+}
+
+/* Change count pill in the table */
+.ta-change-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  background-color: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+/* CURRENT badge — green */
+.ta-current-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  background-color: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+/* CHANGED badge — amber */
+.ta-changed-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  background-color: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+/* Timeline layout */
+.ta-timeline-entry {
+  display: flex;
+  gap: 12px;
+  padding-bottom: 16px;
+  position: relative;
+}
+
+.ta-timeline-entry:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 20px;
+  bottom: 0;
+  width: 2px;
+  background-color: var(--border-color);
+}
+
+.ta-timeline-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 3px;
+  border: 2px solid;
+}
+
+.ta-timeline-dot--current {
+  background-color: rgba(16, 185, 129, 0.2);
+  border-color: #10b981;
+}
+
+.ta-timeline-dot--old {
+  background-color: rgba(245, 158, 11, 0.1);
+  border-color: #f59e0b;
+}
+
+.ta-timeline-content {
+  flex: 1;
+  background-color: var(--bg-sidebar);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+
+.ta-timeline-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  flex-shrink: 0;
+}
+
+.ta-timeline-icon--old {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+}
+
+.ta-goal-text {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.ta-goal-text--old {
+  text-decoration: line-through;
+  opacity: 0.7;
+}

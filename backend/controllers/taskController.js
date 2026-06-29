@@ -54,6 +54,9 @@ export const syncTasks = async (req, res) => {
                 throw new Error('Missing Lightwheel API Token. Please update Admin Settings.');
             }
 
+            const existingTasksRaw = await Task.find({}, { uuid: 1, goalData: 1 }).lean();
+            const existingGoalMap = new Map(existingTasksRaw.map(t => [t.uuid, t.goalData]));
+
             let batch = [];
 
             for (let i = 0; i < projects.length; i++) {
@@ -85,23 +88,33 @@ export const syncTasks = async (req, res) => {
 
                 lightwheelTasks.forEach(task => {
                     const englishData = task.platformTask?.i18n?.English || {};
+                    const newGoalData = englishData.metadata?.goal || 'No goal data provided.';
+                    const existingGoal = existingGoalMap.get(task.uuid);
+                    const goalChanged = existingGoal !== undefined && existingGoal !== newGoalData;
+
+                    const updateDoc = {
+                        $set: {
+                            uuid: task.uuid,
+                            taskId: task.platformTask?.taskId?.toString() || 'UNKNOWN',
+                            taskName: englishData.name || 'Unknown Task',
+                            description: englishData.description || '',
+                            category: proj.category,
+                            pulledNum: task.pulledNum || 0,
+                            totalNum: task.totalNum || 0,
+                            status: task.platformTask?.status ? task.platformTask.status.replace('PLATFORM_TASK_STATUS_', '') : 'UNKNOWN',
+                            initialData: englishData.metadata?.initial || 'No initial data provided.',
+                            goalData: newGoalData
+                        }
+                    };
+
+                    if (goalChanged) {
+                        updateDoc.$push = { goalVersions: { value: existingGoal, changedAt: new Date() } };
+                    }
+
                     batch.push({
                         updateOne: {
                             filter: { uuid: task.uuid },
-                            update: {
-                                $set: {
-                                    uuid: task.uuid, 
-                                    taskId: task.platformTask?.taskId?.toString() || 'UNKNOWN',
-                                    taskName: englishData.name || 'Unknown Task',
-                                    description: englishData.description || '',
-                                    category: proj.category,
-                                    pulledNum: task.pulledNum || 0,
-                                    totalNum: task.totalNum || 0,
-                                    status: task.platformTask?.status ? task.platformTask.status.replace('PLATFORM_TASK_STATUS_', '') : 'UNKNOWN',
-                                    initialData: englishData.metadata?.initial || 'No initial data provided.',
-                                    goalData: englishData.metadata?.goal || 'No goal data provided.'
-                                }
-                            },
+                            update: updateDoc,
                             upsert: true
                         }
                     });
@@ -140,4 +153,22 @@ export const syncTasks = async (req, res) => {
             errorSync(error.message);
         }
     })();
+};
+
+export const getGoalAnomalies = async (req, res) => {
+    try {
+        const { category } = req.query;
+        const query = { 'goalVersions.0': { $exists: true } };
+        if (category && category !== 'ALL') query.category = category;
+
+        const tasks = await Task.find(query)
+            .select('taskId taskName category goalData goalVersions updatedAt')
+            .sort({ taskId: 1 })
+            .lean();
+
+        res.json({ tasks, total: tasks.length });
+    } catch (error) {
+        console.error('getGoalAnomalies error:', error);
+        res.status(500).json({ error: 'Failed to fetch goal anomalies' });
+    }
 };

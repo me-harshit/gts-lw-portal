@@ -14,7 +14,8 @@ import {
   BarChart3,
   ClipboardCheck,
   Cog,
-  ListChecks
+  ListChecks,
+  History
 } from 'lucide-react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -63,6 +64,14 @@ export default function Sidebar() {
           >
             <Layers size={18} className="nav-icon" />
             <span>Task Directory</span>
+          </button>
+
+          <button
+            className={`nav-button ${isActive('/task-anomaly') ? 'active' : ''}`}
+            onClick={() => navigate('/task-anomaly')}
+          >
+            <History size={18} className="nav-icon" />
+            <span>Task Anomaly</span>
           </button>
         </div>
 
