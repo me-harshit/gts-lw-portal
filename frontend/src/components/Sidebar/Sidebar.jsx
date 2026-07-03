@@ -192,6 +192,14 @@ export default function Sidebar() {
             </div>
 
             <button
+              className={`nav-button ${isActive('/manage-projects') ? 'active' : ''}`}
+              onClick={() => navigate('/manage-projects')}
+            >
+              <FolderKanban size={18} className="nav-icon" />
+              <span>Manage Projects</span>
+            </button>
+
+            <button
               className={`nav-button ${isActive('/sync') ? 'active' : ''}`}
               onClick={() => navigate('/sync')}
             >

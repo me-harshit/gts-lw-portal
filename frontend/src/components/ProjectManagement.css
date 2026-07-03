@@ -1,0 +1,317 @@
+.pm-container {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.pm-header-title {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 20px;
+}
+
+.pm-header-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--primary);
+    flex-shrink: 0;
+}
+
+.pm-subtitle {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--text-muted);
+    max-width: 640px;
+    line-height: 1.5;
+}
+
+.pm-error {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* --- ADD FORM --- */
+.pm-add-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--bg-secondary);
+    margin-bottom: 28px;
+}
+
+.pm-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    min-width: 200px;
+}
+
+.pm-field-wide {
+    flex: 2;
+    min-width: 280px;
+}
+
+.pm-field-full {
+    flex-basis: 100%;
+}
+
+.pm-add-form label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.pm-add-form input[type="text"] {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-main);
+    color: var(--text-main);
+    outline: none;
+    font-size: 14px;
+}
+
+.pm-add-form input[type="text"]:focus {
+    border-color: var(--primary);
+}
+
+/* --- ICON PICKER --- */
+.pm-icon-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.pm-icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-main);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.pm-icon-btn:hover {
+    color: var(--text-main);
+    border-color: var(--primary);
+}
+
+.pm-icon-btn.selected {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+}
+
+.pm-field-inline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-basis: 100%;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.pm-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    color: var(--text-main) !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+    cursor: pointer;
+}
+
+.pm-checkbox input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--primary);
+    cursor: pointer;
+}
+
+.pm-add-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    background: var(--primary);
+    color: #fff;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.pm-add-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* --- TABLE --- */
+.pm-table-wrapper {
+    overflow-x: auto;
+}
+
+.pm-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.pm-table th {
+    text-align: left;
+    padding: 12px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
+}
+
+.pm-table td {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-main);
+    font-size: 14px;
+}
+
+.pm-row-disabled {
+    opacity: 0.5;
+}
+
+.pm-project-cell {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.pm-project-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--primary);
+    flex-shrink: 0;
+}
+
+.pm-project-name {
+    font-weight: 600;
+}
+
+.pm-key-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: monospace;
+}
+
+.pm-id-mono {
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* --- TOGGLE SWITCH --- */
+.pm-toggle {
+    position: relative;
+    width: 40px;
+    height: 22px;
+    border-radius: 11px;
+    border: none;
+    background: var(--border-color);
+    cursor: pointer;
+    transition: background 0.2s;
+    padding: 0;
+    vertical-align: middle;
+}
+
+.pm-toggle.on {
+    background: #10b981;
+}
+
+.pm-toggle:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.pm-toggle-knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.2s;
+}
+
+.pm-toggle.on .pm-toggle-knob {
+    transform: translateX(18px);
+}
+
+.pm-delete-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: #ef4444;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.pm-delete-btn:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+.pm-delete-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.pm-empty {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-muted);
+}

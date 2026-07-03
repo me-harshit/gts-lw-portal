@@ -4,9 +4,10 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser'; 
-import { connectDB } from './config/db.js'; 
+import { connectDB } from './config/db.js';
 import { globalSyncState, setIO } from './utils/syncLock.js';
 import { initCronJobs } from './utils/cron.js';
+import { seedProjects } from './utils/seedProjects.js';
 import authRoutes from './routes/authRoutes.js'; 
 import taskRoutes from './routes/taskRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
@@ -16,9 +17,10 @@ import configRoutes from './routes/configRoutes.js';
 import backupRoutes from './routes/backupRoutes.js';
 import attendanceRoutes from './routes/attendanceRoutes.js';
 import userRoutes from './routes/userRoutes.js';
+import projectRoutes from './routes/projectRoutes.js';
 
 dotenv.config();
-connectDB();
+connectDB().then(seedProjects);
 
 const app = express();
 const server = http.createServer(app);
@@ -60,7 +62,8 @@ app.use('/api/leaderboards', leaderboardRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/backups', backupRoutes);
 app.use('/api/attendance', attendanceRoutes);
-app.use('/api/users', userRoutes); 
+app.use('/api/users', userRoutes);
+app.use('/api/projects', projectRoutes);
 
 initCronJobs();
 

@@ -1,5 +1,6 @@
 import AllRecord from '../models/AllRecords.js';
 import TeamMap from '../models/TeamMap.js';
+import { getEnabledKeys } from '../utils/enabledProjects.js';
 
 export const getAcceptanceLeaderboard = async (req, res) => {
     try {
@@ -7,7 +8,8 @@ export const getAcceptanceLeaderboard = async (req, res) => {
 
         let initialMatch = {
             producer: { $exists: true, $ne: "" },
-            inspect_result: { $exists: true }
+            inspect_result: { $exists: true },
+            project_category: { $in: await getEnabledKeys() } // exclude disabled projects
         };
 
         // --- SMART TEAM FILTERING ---
@@ -76,7 +78,8 @@ export const getPerformanceLeaderboard = async (req, res) => {
 
         let initialMatch = {
             producer: { $exists: true, $ne: "" },
-            start_produce_time: { $exists: true, $ne: null }
+            start_produce_time: { $exists: true, $ne: null },
+            project_category: { $in: await getEnabledKeys() } // exclude disabled projects
         };
 
         if (teams && teams !== 'ALL') {
@@ -148,10 +151,11 @@ export const getPerformanceLeaderboard = async (req, res) => {
 export const getQcLeaderboard = async (req, res) => {
     try {
         const { startDate, endDate, teams } = req.query;
-        
+
         let initialMatch = {
             producer: { $exists: true, $ne: "" },
-            start_produce_time: { $exists: true, $ne: null }
+            start_produce_time: { $exists: true, $ne: null },
+            project_category: { $in: await getEnabledKeys() } // exclude disabled projects
         };
 
         if (teams && teams !== 'ALL') {

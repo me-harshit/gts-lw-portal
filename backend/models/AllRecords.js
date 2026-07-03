@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const allRecordSchema = new mongoose.Schema({
     data_name: { type: String, required: true, unique: true },
-    project_category: { type: String, enum: ['OFFICE', 'HOUSE'], required: true },
+    project_category: { type: String, required: true, index: true }, // project key from the Project registry (dynamic)
     project: String,
     producer: String,
     team: String,

@@ -1,12 +1,14 @@
 import AllRecord from '../models/AllRecords.js';
 import TeamMap from '../models/TeamMap.js';
+import { buildCategoryMatch, getEnabledKeys } from '../utils/enabledProjects.js';
 
 export const getDashboardSummary = async (req, res) => {
     try {
         const { category, teams, startDate, endDate } = req.query;
         let baseMatch = { start_produce_time: { $exists: true, $ne: null } };
 
-        if (category && category !== 'ALL') baseMatch.project_category = new RegExp(category, 'i');
+        // Gate to the requested category (if enabled) or all enabled projects; excludes disabled.
+        baseMatch.project_category = await buildCategoryMatch(category);
 
         if (teams && teams !== 'ALL') {
             if (teams === '___NONE___') {
@@ -118,9 +120,8 @@ export const getProducerHistory = async (req, res) => {
         // Base match for the specific producer
         let match = { producer: username, start_produce_time: { $exists: true, $ne: null } };
 
-        if (category && category !== 'ALL') {
-            match.project_category = new RegExp(category, 'i');
-        }
+        // Gate to the requested category (if enabled) or all enabled projects; excludes disabled.
+        match.project_category = await buildCategoryMatch(category);
 
         if (startDate && endDate) {
             match.start_produce_time = {
@@ -205,6 +206,9 @@ export const getQcDetails = async (req, res) => {
 
     try {
         let initialMatch = { start_produce_time: { $exists: true, $ne: null } };
+
+        // Global gate: QC details never include data from disabled projects.
+        initialMatch.project_category = { $in: await getEnabledKeys() };
 
         // 1. Smart Team Filter via TeamMap
         if (teams && teams !== 'ALL') {

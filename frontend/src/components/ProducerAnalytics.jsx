@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useQuery } from '@tanstack/react-query';
 import { Filter, Calendar, User, ListChecks, Search, ChevronDown, Loader2 } from 'lucide-react';
 import { formatDuration } from '../utils/timeFormat';
+import { useProjects } from '../hooks/useProjects';
 import './TaskDashboard.css';
 import './ProjectDashboard.css'; // Inherit layout styles
 import './ProducerAnalytics.css';
@@ -49,6 +50,7 @@ const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder, class
 
 export default function ProducerAnalytics() {
     const [viewCategory, setViewCategory] = useState('ALL');
+    const { enabledProjects } = useProjects();
     const [prodStartDate, setProdStartDate] = useState('');
     const [prodEndDate, setProdEndDate] = useState('');
     const [activeProdFilter, setActiveProdFilter] = useState('allTime');
@@ -127,9 +129,8 @@ export default function ProducerAnalytics() {
                         onChange={setViewCategory} 
                         options={[
                             { value: 'ALL', label: 'All Projects' },
-                            { value: 'OFFICE', label: 'Office Tasks' },
-                            { value: 'HOUSE', label: 'House Tasks' }
-                        ]} 
+                            ...enabledProjects.map(p => ({ value: p.key, label: p.name }))
+                        ]}
                     />
 
                     <div className="pd-date-wrapper">

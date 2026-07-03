@@ -44,6 +44,7 @@ import AttendanceDashboard from './components/AttendanceDashboard';
 import SyncDataPage from './components/SyncDataPage';
 import AdminSettings from './components/AdminSettings';
 import UserManagement from './components/UserManagement';
+import ProjectManagement from './components/ProjectManagement';
 
 const queryClient = new QueryClient();
 
@@ -110,6 +111,11 @@ export default function App() {
                         } />
 
                         {/* ADMIN (Access: Admin) */}
+                        <Route path="/manage-projects" element={
+                            <ProtectedRoute allowedRoles={['ADMIN']}>
+                              <ProjectManagement />
+                            </ProtectedRoute>
+                        } />
                         <Route path="/sync" element={
                             <ProtectedRoute allowedRoles={['ADMIN']}>
                               <SyncDataPage />

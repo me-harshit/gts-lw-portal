@@ -1,9 +1,10 @@
-import { useState, Fragment } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
-import { Search, ChevronDown, ChevronRight, Flag, Target, Building2, Home, Dumbbell, RefreshCw } from 'lucide-react';
+import { Search, ChevronDown, ChevronRight, Flag, Target, RefreshCw } from 'lucide-react';
 import { useSync } from '../context/SyncContext';
-import { PROJECTS } from '../config/constants';
+import { useProjects } from '../hooks/useProjects';
+import { getProjectIcon } from '../config/projectIcons';
 import './TaskDashboard.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -30,19 +31,24 @@ const ProgressBar = ({ pulled, total }) => {
 };
 
 export default function TaskDashboard() {
-    const [activeTab, setActiveTab] = useState('OFFICE');
+    const [activeTab, setActiveTab] = useState(null);
     const [activeFilter, setActiveFilter] = useState('ALL');
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedRows, setExpandedRows] = useState(new Set());
 
+    const { enabledProjects } = useProjects();
     const { startTaskSync, syncState, syncType } = useSync();
     const isTaskSyncing = syncState === 'syncing' && syncType === 'TASK';
 
-    const handleTaskSync = () => startTaskSync([
-        { id: PROJECTS.OFFICE, category: 'OFFICE', name: 'Office Tasks' },
-        { id: PROJECTS.HOUSE, category: 'HOUSE', name: 'House Tasks' },
-        { id: PROJECTS.GYM, category: 'GYM', name: 'Gym Tasks' }
-    ]);
+    // Keep the active tab valid as the project registry loads / changes (e.g. a project is disabled).
+    useEffect(() => {
+        if (enabledProjects.length > 0 && !enabledProjects.some(p => p.key === activeTab)) {
+            setActiveTab(enabledProjects[0].key);
+        }
+    }, [enabledProjects, activeTab]);
+
+    // Backend derives the project list from the registry (all enabled projects).
+    const handleTaskSync = () => startTaskSync();
 
     const { data: allTasks = [], isLoading, isError } = useQuery({
         queryKey: ['tasks'],
@@ -123,27 +129,21 @@ export default function TaskDashboard() {
                 </button>
             </div>
 
-            {/* --- UNIFIED TABS --- */}
-            <div style={{ display: 'flex', gap: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '24px' }}>
-                <button
-                    onClick={() => { setActiveTab('OFFICE'); setActiveFilter('ALL'); setSearchQuery(''); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '600', transition: 'all 0.2s', background: activeTab === 'OFFICE' ? 'rgba(59, 130, 246, 0.1)' : 'transparent', color: activeTab === 'OFFICE' ? 'var(--primary)' : 'var(--text-muted)' }}
-                >
-                    <Building2 size={18} /> Office Tasks
-                </button>
-                <button
-                    onClick={() => { setActiveTab('HOUSE'); setActiveFilter('ALL'); setSearchQuery(''); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '600', transition: 'all 0.2s', background: activeTab === 'HOUSE' ? 'rgba(59, 130, 246, 0.1)' : 'transparent', color: activeTab === 'HOUSE' ? 'var(--primary)' : 'var(--text-muted)' }}
-                >
-                    <Home size={18} /> House Tasks
-                </button>
-                {/* --- NEW GYM TAB --- */}
-                <button
-                    onClick={() => { setActiveTab('GYM'); setActiveFilter('ALL'); setSearchQuery(''); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '600', transition: 'all 0.2s', background: activeTab === 'GYM' ? 'rgba(59, 130, 246, 0.1)' : 'transparent', color: activeTab === 'GYM' ? 'var(--primary)' : 'var(--text-muted)' }}
-                >
-                    <Dumbbell size={18} /> Gym Tasks
-                </button>
+            {/* --- DYNAMIC PROJECT TABS --- */}
+            <div style={{ display: 'flex', gap: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+                {enabledProjects.map((proj) => {
+                    const Icon = getProjectIcon(proj.icon);
+                    const isActive = activeTab === proj.key;
+                    return (
+                        <button
+                            key={proj.key}
+                            onClick={() => { setActiveTab(proj.key); setActiveFilter('ALL'); setSearchQuery(''); }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '600', transition: 'all 0.2s', background: isActive ? 'rgba(59, 130, 246, 0.1)' : 'transparent', color: isActive ? 'var(--primary)' : 'var(--text-muted)' }}
+                        >
+                            <Icon size={18} /> {proj.name}
+                        </button>
+                    );
+                })}
             </div>
 
             <div className="summary-cards">

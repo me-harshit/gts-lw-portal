@@ -3,13 +3,12 @@ import { syncTasks } from '../controllers/taskController.js';
 import { triggerDashboardSync, triggerTranslation } from '../controllers/dashboardController.js';
 import { globalSyncState } from './syncLock.js';
 
-// Mock request/response objects to reuse existing controller logic safely
+// Mock request/response objects to reuse existing controller logic safely.
+// No project list is passed: the sync controllers derive it from the Project registry
+// (Task sync = all enabled projects; QC sync = enabled projects flagged syncQc).
 const mockReqRes = (type) => {
     return [
-        { body: { projects: [
-            { id: "64469240-0c5d-471e-9008-9ccbf03672a3", category: "OFFICE", name: "Office" },
-            { id: "730284cd-4b8b-4975-a8bd-28df1e7aaa06", category: "HOUSE", name: "House" }
-        ], type } },
+        { body: { type } },
         { status: () => ({ json: () => {} }), json: () => {} }
     ];
 };

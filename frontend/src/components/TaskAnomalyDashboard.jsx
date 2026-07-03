@@ -1,7 +1,9 @@
-import { useState, Fragment } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
-import { History, Search, ChevronDown, ChevronRight, Target, Building2, Home, Dumbbell, Clock } from 'lucide-react';
+import { History, Search, ChevronDown, ChevronRight, Target, Clock } from 'lucide-react';
+import { useProjects } from '../hooks/useProjects';
+import { getProjectIcon } from '../config/projectIcons';
 import './TaskDashboard.css';
 import './TaskAnomalyDashboard.css';
 
@@ -19,9 +21,11 @@ const formatDate = (dateVal) => {
 };
 
 export default function TaskAnomalyDashboard() {
-    const [activeTab, setActiveTab] = useState('OFFICE');
+    const [activeTab, setActiveTab] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedRows, setExpandedRows] = useState(new Set());
+
+    const { enabledProjects } = useProjects();
 
     const { data, isLoading, isError } = useQuery({
         queryKey: ['task-anomalies'],
@@ -35,6 +39,13 @@ export default function TaskAnomalyDashboard() {
 
     const allTasks = data || [];
 
+    // Keep the active tab valid as the project registry loads / changes.
+    useEffect(() => {
+        if (enabledProjects.length > 0 && !enabledProjects.some(p => p.key === activeTab)) {
+            setActiveTab(enabledProjects[0].key);
+        }
+    }, [enabledProjects, activeTab]);
+
     const toggleRow = (uuid) => {
         const newExpanded = new Set(expandedRows);
         if (newExpanded.has(uuid)) newExpanded.delete(uuid);
@@ -42,11 +53,10 @@ export default function TaskAnomalyDashboard() {
         setExpandedRows(newExpanded);
     };
 
-    const stats = {
-        OFFICE: allTasks.filter(t => t.category === 'OFFICE').length,
-        HOUSE:  allTasks.filter(t => t.category === 'HOUSE').length,
-        GYM:    allTasks.filter(t => t.category === 'GYM').length,
-    };
+    const stats = {};
+    enabledProjects.forEach(p => {
+        stats[p.key] = allTasks.filter(t => t.category === p.key).length;
+    });
 
     const tabTasks = allTasks.filter(t => t.category === activeTab);
 
@@ -54,6 +64,10 @@ export default function TaskAnomalyDashboard() {
         if (!searchQuery.trim()) return true;
         const q = searchQuery.toLowerCase();
         return task.taskName.toLowerCase().includes(q) || task.taskId.includes(q);
+    }).sort((a, b) => {
+        const aLatest = Math.max(...(a.goalVersions || []).map(v => new Date(v.changedAt).getTime()), 0);
+        const bLatest = Math.max(...(b.goalVersions || []).map(v => new Date(v.changedAt).getTime()), 0);
+        return bLatest - aLatest;
     });
 
     if (isLoading) return <div style={{ color: 'var(--text-main)', padding: '20px' }}>Loading task anomalies...</div>;
@@ -62,67 +76,19 @@ export default function TaskAnomalyDashboard() {
     return (
         <div className="dashboard-card">
             {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                <div className="ta-header-icon">
-                    <History size={20} />
-                </div>
-                <div>
-                    <h2 className="dashboard-header" style={{ margin: 0, color: '#f59e0b' }}>Task Goal Anomalies</h2>
-                    <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                        Tasks whose goal has changed since last sync — {allTasks.length} total
-                    </p>
-                </div>
-            </div>
-
-            {/* Category tabs */}
-            <div style={{ display: 'flex', gap: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '24px', marginTop: '24px' }}>
-                {[
-                    { key: 'OFFICE', label: 'Office Tasks', icon: <Building2 size={18} /> },
-                    { key: 'HOUSE',  label: 'House Tasks',  icon: <Home size={18} /> },
-                    { key: 'GYM',    label: 'Gym Tasks',    icon: <Dumbbell size={18} /> },
-                ].map(({ key, label, icon }) => (
-                    <button
-                        key={key}
-                        onClick={() => { setActiveTab(key); setSearchQuery(''); setExpandedRows(new Set()); }}
-                        style={{
-                            display: 'flex', alignItems: 'center', gap: '8px',
-                            padding: '10px 20px', borderRadius: '8px', border: 'none',
-                            cursor: 'pointer', fontWeight: '600', transition: 'all 0.2s',
-                            background: activeTab === key ? 'rgba(245, 158, 11, 0.1)' : 'transparent',
-                            color: activeTab === key ? '#f59e0b' : 'var(--text-muted)'
-                        }}
-                    >
-                        {icon} {label}
-                        {stats[key] > 0 && (
-                            <span className="ta-count-badge">{stats[key]}</span>
-                        )}
-                    </button>
-                ))}
-            </div>
-
-            {/* Stat cards */}
-            <div className="summary-cards" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: '24px' }}>
-                {[
-                    { key: 'OFFICE', label: 'Office Anomalies', icon: <Building2 size={16} /> },
-                    { key: 'HOUSE',  label: 'House Anomalies',  icon: <Home size={16} /> },
-                    { key: 'GYM',    label: 'Gym Anomalies',    icon: <Dumbbell size={16} /> },
-                ].map(({ key, label, icon }) => (
-                    <div
-                        key={key}
-                        className={`summary-card ta-stat-card ${activeTab === key ? 'ta-stat-card--active' : ''}`}
-                        onClick={() => { setActiveTab(key); setSearchQuery(''); setExpandedRows(new Set()); }}
-                    >
-                        <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            {icon} {label}
-                        </span>
-                        <span className="card-value">{stats[key]}</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div className="ta-header-icon">
+                        <History size={20} />
                     </div>
-                ))}
-            </div>
-
-            {/* Search */}
-            <div className="dashboard-controls">
-                <div className="search-wrapper">
+                    <div>
+                        <h2 className="dashboard-header" style={{ margin: 0, color: '#f59e0b' }}>Task Goal Anomalies</h2>
+                        <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            Tasks whose goal has changed since last sync — {allTasks.length} total
+                        </p>
+                    </div>
+                </div>
+                <div className="search-wrapper" style={{ width: '260px', flexShrink: 0 }}>
                     <Search className="search-icon" size={18} />
                     <input
                         type="text"
@@ -132,6 +98,32 @@ export default function TaskAnomalyDashboard() {
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
                 </div>
+            </div>
+
+            {/* Category tabs */}
+            <div style={{ display: 'flex', gap: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '24px', marginTop: '24px' }}>
+                {enabledProjects.map((proj) => {
+                    const key = proj.key;
+                    const Icon = getProjectIcon(proj.icon);
+                    return (
+                        <button
+                            key={key}
+                            onClick={() => { setActiveTab(key); setSearchQuery(''); setExpandedRows(new Set()); }}
+                            style={{
+                                display: 'flex', alignItems: 'center', gap: '8px',
+                                padding: '10px 20px', borderRadius: '8px', border: 'none',
+                                cursor: 'pointer', fontWeight: '600', transition: 'all 0.2s',
+                                background: activeTab === key ? 'rgba(245, 158, 11, 0.1)' : 'transparent',
+                                color: activeTab === key ? '#f59e0b' : 'var(--text-muted)'
+                            }}
+                        >
+                            <Icon size={18} /> {proj.name}
+                            {stats[key] > 0 && (
+                                <span className="ta-count-badge">{stats[key]}</span>
+                            )}
+                        </button>
+                    );
+                })}
             </div>
 
             {/* Table */}
@@ -152,7 +144,7 @@ export default function TaskAnomalyDashboard() {
                             <td colSpan="6" style={{ textAlign: 'center', padding: '48px', color: 'var(--text-muted)' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
                                     <History size={32} style={{ opacity: 0.3 }} />
-                                    <span>No goal changes detected for {activeTab.toLowerCase()} tasks.</span>
+                                    <span>No goal changes detected for {(activeTab || '').toLowerCase()} tasks.</span>
                                     <span style={{ fontSize: '12px' }}>Goal changes are recorded automatically during Task Sync.</span>
                                 </div>
                             </td>

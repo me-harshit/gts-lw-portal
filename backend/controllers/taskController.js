@@ -2,7 +2,8 @@ import axios from 'axios';
 import https from 'https';
 import Task from '../models/Task.js';
 import AppConfig from '../models/AppConfig.js';
-import { globalSyncState, updateSyncState, finishSync, errorSync } from '../utils/syncLock.js'; 
+import { globalSyncState, updateSyncState, finishSync, errorSync } from '../utils/syncLock.js';
+import { getEnabledKeys, buildCategoryMatch, getSyncProjects } from '../utils/enabledProjects.js';
 
 const httpsAgent = new https.Agent({ 
     keepAlive: true,
@@ -22,7 +23,8 @@ const getHeaders = (config) => ({
 
 export const getTasks = async (req, res) => {
     try {
-        const tasks = await Task.find().sort({ taskId: 1 });
+        // Global gate: only tasks belonging to currently-enabled projects are ever returned.
+        const tasks = await Task.find({ category: { $in: await getEnabledKeys() } }).sort({ taskId: 1 });
         res.json(tasks);
     } catch (error) {
         console.error("Database Fetch Error:", error);
@@ -35,7 +37,7 @@ export const syncTasks = async (req, res) => {
         return res.status(409).json({ error: 'A sync operation is already in progress globally.' });
     }
 
-    const { projects } = req.body; 
+    const bodyProjects = req.body?.projects;
 
     updateSyncState({
         isSyncing: true,
@@ -49,9 +51,19 @@ export const syncTasks = async (req, res) => {
     (async () => {
         try {
             const config = await AppConfig.findOne({ configId: 'global_settings' });
-            
+
             if (!config || !config.lightwheelToken) {
                 throw new Error('Missing Lightwheel API Token. Please update Admin Settings.');
+            }
+
+            // Derive the project list from the registry (all enabled) unless callers pass an
+            // explicit list. Disabled projects are never synced — enforced server-side.
+            const projects = (Array.isArray(bodyProjects) && bodyProjects.length > 0)
+                ? bodyProjects
+                : await getSyncProjects();
+
+            if (!projects || projects.length === 0) {
+                throw new Error('No enabled projects to sync. Add or enable a project in Manage Projects.');
             }
 
             const existingTasksRaw = await Task.find({}, { uuid: 1, goalData: 1 }).lean();
@@ -90,7 +102,8 @@ export const syncTasks = async (req, res) => {
                     const englishData = task.platformTask?.i18n?.English || {};
                     const newGoalData = englishData.metadata?.goal || 'No goal data provided.';
                     const existingGoal = existingGoalMap.get(task.uuid);
-                    const goalChanged = existingGoal !== undefined && existingGoal !== newGoalData;
+                    const isActive = (task.pulledNum || 0) > 0 && (task.pulledNum || 0) < (task.totalNum || 0);
+                    const goalChanged = isActive && existingGoal !== undefined && existingGoal !== newGoalData;
 
                     const updateDoc = {
                         $set: {
@@ -158,8 +171,14 @@ export const syncTasks = async (req, res) => {
 export const getGoalAnomalies = async (req, res) => {
     try {
         const { category } = req.query;
-        const query = { 'goalVersions.0': { $exists: true } };
-        if (category && category !== 'ALL') query.category = category;
+        // buildCategoryMatch resolves a specific enabled category, or all enabled keys, and
+        // always excludes disabled projects.
+        const query = {
+            'goalVersions.0': { $exists: true },
+            category: await buildCategoryMatch(category),
+            pulledNum: { $gt: 0 },
+            $expr: { $lt: ['$pulledNum', '$totalNum'] }
+        };
 
         const tasks = await Task.find(query)
             .select('taskId taskName category goalData goalVersions updatedAt')

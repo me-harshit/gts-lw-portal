@@ -6,6 +6,7 @@ import AppConfig from '../models/AppConfig.js';
 import https from 'https';
 import translate from 'google-translate-api-x';
 import { globalSyncState, updateSyncState, finishSync, errorSync, broadcastTranslationUpdate } from '../utils/syncLock.js';
+import { getEnabledKeys, getSyncProjects } from '../utils/enabledProjects.js';
 
 const httpsAgent = new https.Agent({
     keepAlive: true,
@@ -33,7 +34,7 @@ export const triggerDashboardSync = async (req, res) => {
         return res.status(409).json({ error: 'A sync operation is already in progress globally.' });
     }
 
-    const { projects } = req.body;
+    const bodyProjects = req.body?.projects;
 
     updateSyncState({
         isSyncing: true,
@@ -49,6 +50,15 @@ export const triggerDashboardSync = async (req, res) => {
             const config = await AppConfig.findOne({ configId: 'global_settings' });
             if (!config || !config.lightwheelToken) {
                 throw new Error('Missing Lightwheel API Token. Please update Admin Settings.');
+            }
+
+            // Default to enabled projects flagged for QC sync unless an explicit list is passed.
+            const projects = (Array.isArray(bodyProjects) && bodyProjects.length > 0)
+                ? bodyProjects
+                : await getSyncProjects({ qcOnly: true });
+
+            if (!projects || projects.length === 0) {
+                throw new Error('No projects are enabled for QC sync. Toggle "Sync QC" on a project in Manage Projects.');
             }
 
             let totalProcessed = 0;
@@ -500,6 +510,9 @@ export const getAnomalies = async (req, res) => {
                 query.updatedAt = dateQuery;
             }
         }
+
+        // Global gate: anomalies from disabled projects are never shown.
+        query.project_category = { $in: await getEnabledKeys() };
 
         const skip = (Number(page) - 1) * Number(limit);
         const totalRecords = await AllRecord.countDocuments(query);

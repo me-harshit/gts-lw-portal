@@ -5,7 +5,7 @@ const taskSchema = new mongoose.Schema({
     taskId: { type: String, required: true, index: true },
     taskName: { type: String, required: true },
     description: { type: String, default: '' },
-    category: { type: String, enum: ['OFFICE', 'HOUSE', 'GYM'], required: true },
+    category: { type: String, required: true, index: true }, // project key from the Project registry (dynamic)
     
     pulledNum: { type: Number, default: 0 },
     totalNum: { type: Number, default: 0 },

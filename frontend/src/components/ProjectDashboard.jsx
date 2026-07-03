@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useQuery } from '@tanstack/react-query';
 import { Filter, Calendar, Users, ChevronDown, Activity, Loader2, Tag as TagIcon, Clock, TrendingUp, BarChart2 } from 'lucide-react';
+import { useProjects } from '../hooks/useProjects';
 import './TaskDashboard.css';
 import './ProjectDashboard.css';
 
@@ -245,6 +246,7 @@ function BarLineChart({ data, todayStr, splitDate, prevLabel, currLabel }) {
 
 export default function ProjectDashboard() {
     const [viewCategory, setViewCategory] = useState('ALL');
+    const { enabledProjects } = useProjects();
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [activeGlobalFilter, setActiveGlobalFilter] = useState('thisMonth');
@@ -431,7 +433,7 @@ export default function ProjectDashboard() {
                     <CustomSelect className="pd-select-sm" icon={TagIcon} value={activeTag} onChange={setActiveTag} options={[{ value: 'ALL', label: 'All Tags' }, ...tags.map(t => ({ value: t, label: t }))]} />
                     <CustomSelect className="pd-select-md" icon={Clock} value={activeShift} onChange={setActiveShift} options={[{ value: 'ALL', label: 'All Shifts' }, ...shifts.map(s => ({ value: s, label: s }))]} />
                     <CustomSelect className="pd-select-sm" icon={Users} value={teamCategory} onChange={setTeamCategory} options={[{ value: 'ALL', label: 'All Teams' }, ...teams.map(t => ({ value: t, label: t }))]} />
-                    <CustomSelect className="pd-select-sm" icon={Filter} value={viewCategory} onChange={setViewCategory} options={[{ value: 'ALL', label: 'All Projects' }, { value: 'OFFICE', label: 'Office Tasks' }, { value: 'HOUSE', label: 'House Tasks' }, { value: 'GYM', label: 'Gym Tasks' }]} />
+                    <CustomSelect className="pd-select-sm" icon={Filter} value={viewCategory} onChange={setViewCategory} options={[{ value: 'ALL', label: 'All Projects' }, ...enabledProjects.map(p => ({ value: p.key, label: p.name }))]} />
 
                     <div className="pd-date-wrapper">
                         <Calendar size={16} className="pd-icon-muted" />

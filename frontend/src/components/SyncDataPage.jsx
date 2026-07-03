@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Database, Layers, ShieldAlert, RefreshCw, Clock, Languages, XCircle, HardDrive, Archive, Download } from 'lucide-react';
 import { useSync } from '../context/SyncContext';
-import { PROJECTS } from '../config/constants';
 import './ProjectDashboard.css';
 import './SyncDataPage.css';
 
@@ -75,16 +74,10 @@ export default function SyncDataPage() {
         return new Date(isoString).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' });
     };
 
-    const handleTaskSync = () => startTaskSync([
-        { id: PROJECTS.OFFICE, category: 'OFFICE', name: 'Office Tasks' },
-        { id: PROJECTS.HOUSE, category: 'HOUSE', name: 'House Tasks' },
-        { id: PROJECTS.GYM, category: 'GYM', name: 'Gym Tasks' }
-    ]);
-    const handleQcSync = () => startQcSync([
-        { id: PROJECTS.OFFICE, category: 'OFFICE', name: 'Office Tasks' },
-        { id: PROJECTS.HOUSE, category: 'HOUSE', name: 'House Tasks' },
-        { id: PROJECTS.GYM, category: 'GYM', name: 'Gym Tasks' }
-    ]);
+    // Project lists are derived server-side from the registry (Task = all enabled;
+    // QC = enabled projects flagged "Sync QC"), so the buttons just trigger.
+    const handleTaskSync = () => startTaskSync();
+    const handleQcSync = () => startQcSync();
 
     const translationPercent = translationData.total > 0 ? Math.round((translationData.processed / translationData.total) * 100) : 0;
     const isStopping = translationData.message === "Stopping Engine...";
