@@ -74,17 +74,23 @@ export const getAcceptanceLeaderboard = async (req, res) => {
 
 export const getPerformanceLeaderboard = async (req, res) => {
     try {
-        const { startDate, endDate, teams } = req.query;
+        // Extract category from query
+        const { startDate, endDate, teams, category } = req.query;
 
         let initialMatch = {
             producer: { $exists: true, $ne: "" },
-            start_produce_time: { $exists: true, $ne: null },
-            project_category: { $in: await getEnabledKeys() } // exclude disabled projects
+            start_produce_time: { $exists: true, $ne: null }
         };
 
+        // --- NEW PROJECT CATEGORY FILTER ---
+        if (category && category !== 'ALL') {
+            initialMatch.project_category = new RegExp(category, 'i');
+        }
+
+        // Smart Team Filtering
         if (teams && teams !== 'ALL') {
             if (teams === '___NONE___') {
-                initialMatch.producer = { $in: [] }; 
+                initialMatch.producer = { $in: [] };
             } else {
                 const teamArray = teams.split(',');
                 const mappings = await TeamMap.find({ teamName: { $in: teamArray } }).lean();
@@ -92,25 +98,23 @@ export const getPerformanceLeaderboard = async (req, res) => {
             }
         }
 
-        // LEARNING POINT: Filter dates BEFORE doing any transformations. 
-        // This utilizes DB indexes and speeds up the query massively.
+        // Strict Beijing Date Filtering
         if (startDate || endDate) {
             initialMatch.start_produce_time = {};
             if (startDate) initialMatch.start_produce_time.$gte = new Date(`${startDate}T00:00:00.000+08:00`);
             if (endDate) initialMatch.start_produce_time.$lte = new Date(`${endDate}T23:59:59.999+08:00`);
         }
 
-        const pipeline = [ { $match: initialMatch } ];
+        const pipeline = [{ $match: initialMatch }];
 
         pipeline.push({
             $addFields: {
                 safe_video_duration: { $convert: { input: "$video_duration", to: "double", onError: 0, onNull: 0 } },
-                // Native timezone grouping
                 working_date: { $dateToString: { format: "%Y-%m-%d", date: "$start_produce_time", timezone: "+08:00" } }
             }
         });
 
-        // GROUP 1: By Producer & Date to get daily duration
+        // Group 1: Daily duration per producer
         pipeline.push({
             $group: {
                 _id: { producer: "$producer", date: "$working_date" },
@@ -118,7 +122,7 @@ export const getPerformanceLeaderboard = async (req, res) => {
             }
         });
 
-        // GROUP 2: Rollup by Producer for total and average
+        // Group 2: Total duration and active days
         pipeline.push({
             $group: {
                 _id: "$_id.producer",
@@ -160,7 +164,7 @@ export const getQcLeaderboard = async (req, res) => {
 
         if (teams && teams !== 'ALL') {
             if (teams === '___NONE___') {
-                initialMatch.producer = { $in: [] }; 
+                initialMatch.producer = { $in: [] };
             } else {
                 const teamArray = teams.split(',');
                 const mappings = await TeamMap.find({ teamName: { $in: teamArray } }).lean();
@@ -175,7 +179,7 @@ export const getQcLeaderboard = async (req, res) => {
             if (endDate) initialMatch.start_produce_time.$lte = new Date(`${endDate}T23:59:59.999+08:00`);
         }
 
-        const pipeline = [ { $match: initialMatch } ];
+        const pipeline = [{ $match: initialMatch }];
 
         // LEARNING POINT: We deleted working_date entirely. 
         // If you aren't grouping by day, don't waste CPU calculating it.
@@ -204,7 +208,7 @@ export const getQcLeaderboard = async (req, res) => {
             const checkedDuration = producer.passedDuration + producer.failedDuration;
 
             const waitingVideos = producer.totalVideos - checkedVideos;
-            const waitingDuration = Math.max(0, producer.totalDuration - checkedDuration); 
+            const waitingDuration = Math.max(0, producer.totalDuration - checkedDuration);
 
             const passRate = checkedDuration > 0 ? ((producer.passedDuration / checkedDuration) * 100).toFixed(2) : '0.00';
             const failRate = checkedDuration > 0 ? ((producer.failedDuration / checkedDuration) * 100).toFixed(2) : '0.00';

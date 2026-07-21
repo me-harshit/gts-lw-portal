@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Filter, Calendar, Loader2, Zap, Download, ChevronDown, Tag as TagIcon, Clock, Users } from 'lucide-react';
 import { formatDuration } from '../utils/timeFormat';
 import { generateLeaderboardPDF } from '../utils/pdfExport';
+import { useProjects } from '../hooks/useProjects'; // Imported useProjects hook
 import './TaskDashboard.css';
 import './PerformanceLeaderboard.css';
 
@@ -67,7 +68,9 @@ export default function PerformanceLeaderboard() {
     const [activeFilterBtn, setActiveFilterBtn] = useState('');
     const [isExporting, setIsExporting] = useState(false);
     
-    // Metadata Filters
+    // Project & Metadata Filters
+    const [viewCategory, setViewCategory] = useState('ALL'); // New category state
+    const { enabledProjects } = useProjects(); // Fetch active projects
     const [activeTag, setActiveTag] = useState('ALL');
     const [activeShift, setActiveShift] = useState('ALL');
     const [teamCategory, setTeamCategory] = useState('ALL');
@@ -145,9 +148,10 @@ export default function PerformanceLeaderboard() {
     }
 
     const { data: filteredResult, isFetching: isFetchingFiltered } = useQuery({
-        queryKey: ['perfFiltered', activeTag, activeShift, teamCategory, startDate, endDate, teamConfigs.length],
+        // Added viewCategory to queryKey to trigger refetch on change
+        queryKey: ['perfFiltered', activeTag, activeShift, teamCategory, viewCategory, startDate, endDate, teamConfigs.length],
         queryFn: async () => {
-            let url = `${API_URL}/api/leaderboards/performance?teams=${teamQuery}`;
+            let url = `${API_URL}/api/leaderboards/performance?teams=${teamQuery}&category=${viewCategory}`;
             if (startDate && endDate) {
                 url += `&startDate=${startDate}&endDate=${endDate}`;
             }
@@ -160,9 +164,10 @@ export default function PerformanceLeaderboard() {
     });
 
     const { data: allTimeResult, isFetching: isFetchingAllTime } = useQuery({
-        queryKey: ['perfAllTime', activeTag, activeShift, teamCategory, teamConfigs.length],
+        // Added viewCategory to queryKey
+        queryKey: ['perfAllTime', activeTag, activeShift, teamCategory, viewCategory, teamConfigs.length],
         queryFn: async () => {
-            const url = `${API_URL}/api/leaderboards/performance?teams=${teamQuery}`;
+            const url = `${API_URL}/api/leaderboards/performance?teams=${teamQuery}&category=${viewCategory}`;
             const res = await axios.get(url);
             return res.data;
         },
@@ -261,7 +266,7 @@ export default function PerformanceLeaderboard() {
                         value={activeTag} 
                         onChange={setActiveTag} 
                         options={[{ value: 'ALL', label: 'All Tags' }, ...tags.map(t => ({ value: t, label: t }))]} 
-                        containerStyle={{ width: '180px', height: '40px' }} 
+                        containerStyle={{ width: '150px', height: '40px' }} 
                     />
                     
                     <CustomSelect 
@@ -269,7 +274,7 @@ export default function PerformanceLeaderboard() {
                         value={activeShift} 
                         onChange={setActiveShift} 
                         options={[{ value: 'ALL', label: 'All Shifts' }, ...shifts.map(s => ({ value: s, label: s }))]} 
-                        containerStyle={{ width: '220px', height: '40px' }} 
+                        containerStyle={{ width: '180px', height: '40px' }} 
                     />
                     
                     <CustomSelect 
@@ -277,6 +282,15 @@ export default function PerformanceLeaderboard() {
                         value={teamCategory} 
                         onChange={setTeamCategory} 
                         options={[{ value: 'ALL', label: 'All Teams' }, ...teams.map(t => ({ value: t, label: t }))]} 
+                        containerStyle={{ width: '160px', height: '40px' }} 
+                    />
+
+                    {/* NEW PROJECT FILTER DROPDOWN */}
+                    <CustomSelect 
+                        icon={Filter} 
+                        value={viewCategory} 
+                        onChange={setViewCategory} 
+                        options={[{ value: 'ALL', label: 'All Projects' }, ...(enabledProjects || []).map(p => ({ value: p.key, label: p.name }))]} 
                         containerStyle={{ width: '180px', height: '40px' }} 
                     />
 
@@ -347,7 +361,6 @@ export default function PerformanceLeaderboard() {
                                             {row.producer}
                                         </td>
 
-                                        {/* --- NEW DETAILS COLUMN --- */}
                                         <td style={{ padding: '12px 16px' }}>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                                 <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-main)' }}>{row.teamName}</span>
