@@ -30,8 +30,8 @@ export const initCronJobs = () => {
         await syncTasks(req, res);
     });
 
-    // 2. QC Sync: Every 2 Hours from 6 AM to 10 PM IST ('0 6-22/2 * * *')
-    cron.schedule('0 6-22/2 * * *', async () => {
+    // 2. QC Sync: Once a day at 8 AM IST ('0 8 * * *')
+    cron.schedule('0 8 * * *', async () => {
         if (globalSyncState.isSyncing) return console.log("[Cron] QC Sync skipped: Another sync active.");
         console.log("[Cron] Triggering Automated QC Sync...");
         
