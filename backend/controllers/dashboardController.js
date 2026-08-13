@@ -100,19 +100,19 @@ export const triggerDashboardSync = async (req, res) => {
                 }
 
                 // ==========================================
-                // 2. POLL FOR ZIP COMPILATION (Max 10 Attempts)
+                // 2. POLL FOR ZIP COMPILATION (Max 40 Attempts)
                 // ==========================================
                 updateSyncState({ message: `${prefix}Waiting for ZIP compilation...` });
                 let downloadUrl = null;
                 let listAttempts = 0;
 
-                while (listAttempts < 10 && !downloadUrl) {
+                while (listAttempts < 40 && !downloadUrl) {
                     try {
                         listAttempts++;
                         // Wait a base time of 30 seconds between checks so we don't spam the server
                         await new Promise(resolve => setTimeout(resolve, 30000));
 
-                        updateSyncState({ message: `${prefix}Checking ZIP Status... (Attempt ${listAttempts}/10)` });
+                        updateSyncState({ message: `${prefix}Checking ZIP Status... (Attempt ${listAttempts}/40)` });
 
                         const listRes = await axios.post(
                             `${config.lightwheelQcApi}/list`,
@@ -128,11 +128,11 @@ export const triggerDashboardSync = async (req, res) => {
                         if (pollError.response && pollError.response.status === 401) {
                             throw new Error('Lightwheel Token Expired! Please refresh in Admin Settings.');
                         }
-                        if (listAttempts >= 10) throw new Error(`${proj.name} Export Timeout: ZIP never finished after 10 checks.`);
+                        if (listAttempts >= 40) throw new Error(`${proj.name} Export Timeout: ZIP never finished after 40 checks.`);
 
                         // IF RATE LIMITED, WAIT 30 MINS
                         if (pollError.response && (pollError.response.status === 429 || pollError.response.status >= 500)) {
-                            updateSyncState({ message: `${prefix}Rate Limited on Check. Pausing 30 mins... (Attempt ${listAttempts}/10)` });
+                            updateSyncState({ message: `${prefix}Rate Limited on Check. Pausing 30 mins... (Attempt ${listAttempts}/40)` });
                             await new Promise(resolve => setTimeout(resolve, THIRTY_MINUTES));
                         }
                     }
