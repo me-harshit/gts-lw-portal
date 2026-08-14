@@ -121,8 +121,14 @@ export const triggerDashboardSync = async (req, res) => {
                         );
 
                         const match = listRes.data.data.find(item => item.id === exportId);
-                        if (match && match.downloadUrl) {
-                            downloadUrl = match.downloadUrl;
+                        if (match) {
+                            if (match.downloadUrl) {
+                                downloadUrl = match.downloadUrl;
+                            } else {
+                                console.log(`[QC Sync] Export ${exportId} not ready yet. Lightwheel status:`, match.status || 'unknown', match);
+                            }
+                        } else {
+                            console.log(`[QC Sync] Export ${exportId} not found in the list response.`);
                         }
                     } catch (pollError) {
                         if (pollError.response && pollError.response.status === 401) {
